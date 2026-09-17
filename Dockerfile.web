@@ -1,0 +1,8 @@
+FROM python:3.11-slim-bookworm
+WORKDIR /workspace
+COPY requirements-web.txt .
+RUN pip install --no-cache-dir -r requirements-web.txt
+ENV PYTHONPATH=/workspace ARTIFACTS_PATH=/artifacts
+COPY app app
+EXPOSE 8501
+CMD ["streamlit", "run", "app/Home.py", "--server.address=0.0.0.0", "--server.headless=true", "--browser.gatherUsageStats=false"]

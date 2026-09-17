@@ -1,0 +1,8 @@
+.git
+*.jsonl
+*.gz
+artifacts
+data
+.venv
+__pycache__
+.pytest_cache

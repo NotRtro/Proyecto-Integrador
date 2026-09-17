@@ -1,0 +1,75 @@
+x-pipeline: &pipeline
+  build:
+    context: .
+    dockerfile: Dockerfile.pipeline
+  image: oece-pipeline:local
+  volumes:
+    - .:/data/raw:ro
+    - ./data/processed:/data/processed
+    - ./artifacts:/artifacts
+  environment: &environment
+    RAW_PATH: /data/raw
+    PROCESSED_PATH: /data/processed
+    ARTIFACTS_PATH: /artifacts
+    ANALYSIS_YEARS: ${ANALYSIS_YEARS:-2023,2024,2025}
+    RANDOM_SEED: ${RANDOM_SEED:-42}
+    OPENBLAS_NUM_THREADS: 1
+    OMP_NUM_THREADS: 1
+    SPARK_MASTER_URL: spark://spark-master:7077
+    SPARK_DRIVER_HOST: pipeline
+    SPARK_EXECUTOR_MEMORY: ${SPARK_EXECUTOR_MEMORY:-2g}
+    PYSPARK_SUBMIT_ARGS: --driver-memory ${SPARK_DRIVER_MEMORY:-2g} pyspark-shell
+    SAMPLE_SIZE: ${SAMPLE_SIZE:-600}
+    ANN_SAMPLE_SIZE: ${ANN_SAMPLE_SIZE:-5000}
+    APRIORI_SAMPLE_SIZE: ${APRIORI_SAMPLE_SIZE:-10000}
+services:
+  spark-master:
+    <<: *pipeline
+    hostname: spark-master
+    command: ["bash", "-c", "exec $$SPARK_HOME/bin/spark-class org.apache.spark.deploy.master.Master --host spark-master --port 7077 --webui-port 8080"]
+    ports: ["127.0.0.1:7077:7077", "127.0.0.1:8080:8080"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/json/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  spark-worker-1:
+    <<: *pipeline
+    command: ["bash", "-c", "exec $$SPARK_HOME/bin/spark-class org.apache.spark.deploy.worker.Worker --cores 2 --memory ${SPARK_WORKER_MEMORY:-2g} --webui-port 8081 spark://spark-master:7077"]
+    ports: ["127.0.0.1:8081:8081"]
+    depends_on:
+      spark-master: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/json/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  spark-worker-2:
+    <<: *pipeline
+    command: ["bash", "-c", "exec $$SPARK_HOME/bin/spark-class org.apache.spark.deploy.worker.Worker --cores 2 --memory ${SPARK_WORKER_MEMORY:-2g} --webui-port 8081 spark://spark-master:7077"]
+    ports: ["127.0.0.1:8082:8081"]
+    depends_on:
+      spark-master: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/json/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  pipeline:
+    <<: *pipeline
+    hostname: pipeline
+    profiles: ["jobs"]
+    depends_on:
+      spark-worker-1: {condition: service_healthy}
+      spark-worker-2: {condition: service_healthy}
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports: ["127.0.0.1:${WEB_PORT:-8501}:8501"]
+    volumes: ["./artifacts:/artifacts:ro"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
