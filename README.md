@@ -1,7 +1,5 @@
 # Minería de contrataciones OECE · 2023–2025
 
-Proyecto basado en `PLAN_EJECUCION_OECE_JSON_DOCKER.md`. Procesa los tres archivos locales `peru_oece_bulk_2023.jsonl`, `peru_oece_bulk_2024.jsonl`, `peru_oece_bulk_2025.jsonl`, genera tablas Parquet y presenta cinco experimentos en Streamlit.
-
 ## Ejecutar
 
 Requisitos: Docker Desktop iniciado, Docker Compose v2, aproximadamente 10 GB de RAM asignados a Docker y espacio libre para imágenes y resultados. No se requiere Python ni Java en el anfitrión. Ejecutar desde esta carpeta:
