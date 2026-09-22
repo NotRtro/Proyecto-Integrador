@@ -47,6 +47,6 @@ export default function App() {
       <nav>{pages.map(([id, label, Icon]) => <button className={page === id ? 'active' : ''} onClick={() => navigate(id)} key={id}><Icon size={19} /><span>{label}</span></button>)}</nav>
       <div className="sidebar-note"><span className="live-dot" />Datos procesados <strong>2023–2025</strong><small>Fuente: OECE · OCDS</small></div>
     </aside>
-    <main><div className="topbar"><div><span className="live-dot" />Resultados precalculados</div><span>Vista ejecutiva + detalle técnico</span></div><Page /></main>
+    <main><div className="topbar"><div><span className="live-dot" />Resultados precalculados</div></div><Page /></main>
   </div>
 }

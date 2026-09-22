@@ -29,7 +29,6 @@ export default function Discussion() {
     <div className="risk-grid"><div><span>01</span><p><strong>Los montos no son gasto ejecutado.</strong> Se analizan valores convocados y adjudicados publicados.</p></div><div><span>02</span><p><strong>La similitud no prueba duplicidad.</strong> Los textos pueden compartir plantillas o contextos legítimos.</p></div><div><span>03</span><p><strong>La asociación no prueba causalidad.</strong> El lift depende de la composición del conjunto.</p></div><div><span>04</span><p><strong>La geografía es institucional.</strong> El departamento corresponde al comprador, no necesariamente a la ejecución.</p></div></div>
     <Technical title="Detalle técnico: validaciones y trabajo pendiente">
       <DataTable rows={Object.entries(o.validation.checks).map(([control, result]) => ({ control, result }))} />
-      <h4>Pendientes de la entrega académica</h4><ul>{o.validation.academic_pending.map(item => <li key={item}>{item}</li>)}</ul>
       <p>Con 10× datos se deben aumentar particiones y medir el driver. Con 100× conviene evitar recolectar candidatos e itemsets, particionar índices ANN y paginar agregados.</p>
     </Technical>
   </>
