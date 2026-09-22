@@ -62,14 +62,26 @@ services:
     depends_on:
       spark-worker-1: {condition: service_healthy}
       spark-worker-2: {condition: service_healthy}
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports: ["127.0.0.1:8000:8000"]
+    volumes: ["./artifacts:/artifacts:ro"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
   web:
     build:
       context: .
-      dockerfile: Dockerfile.web
-    ports: ["127.0.0.1:${WEB_PORT:-8501}:8501"]
-    volumes: ["./artifacts:/artifacts:ro"]
+      dockerfile: Dockerfile.frontend
+    ports: ["127.0.0.1:${WEB_PORT:-8501}:80"]
+    depends_on:
+      api: {condition: service_healthy}
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
       interval: 10s
       timeout: 5s
       retries: 12

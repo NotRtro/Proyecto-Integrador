@@ -1,5 +1,7 @@
 # Minería de contrataciones OECE · 2023–2025
 
+Proyecto basado en `PLAN_EJECUCION_OECE_JSON_DOCKER.md`. Procesa los tres archivos locales `peru_oece_bulk_2023.jsonl`, `peru_oece_bulk_2024.jsonl`, `peru_oece_bulk_2025.jsonl`, genera tablas Parquet, expone resultados mediante una API FastAPI y presenta cinco experimentos en una aplicación React.
+
 ## Ejecutar
 
 Requisitos: Docker Desktop iniciado, Docker Compose v2, aproximadamente 10 GB de RAM asignados a Docker y espacio libre para imágenes y resultados. No se requiere Python ni Java en el anfitrión. Ejecutar desde esta carpeta:
@@ -12,20 +14,20 @@ Equivale a:
 
 ```bash
 docker compose build
-docker compose up -d --wait spark-master spark-worker-1 spark-worker-2 web
+docker compose up -d --wait spark-master spark-worker-1 spark-worker-2 api web
 docker compose run --rm pipeline python -m src.run_all
 ```
 
-Abrir **http://localhost:8501**. Spark Master: http://localhost:8080; workers: http://localhost:8081 y http://localhost:8082. La web puede abrirse mientras se calculan los resultados; informa de artefactos pendientes.
+Abrir **http://localhost:8501**. La documentación interactiva de la API está en **http://localhost:8000/docs**. Spark Master: http://localhost:8080; workers: http://localhost:8081 y http://localhost:8082.
 
 Los archivos originales se montan en solo lectura. `artifacts/` y `data/processed/` son directorios persistentes del anfitrión; `docker compose down` no los elimina. No se duplican ni descargan los 3 GB ya proporcionados. También se admite `.jsonl.gz`. Evitar colocar copias de los mismos archivos en la raíz.
 
 ## Comandos
 
 ```bash
+# Ejecuta pruebas de algoritmos, integración, API y frontend.
+# Requiere artefactos generados para comprobar la API.
 make test
-# Verificar páginas y controles (después de generar artefactos):
-docker compose run --rm --no-deps -v "$(pwd)/scripts:/checks:ro" web python /checks/test_web.py
 # Validación, hashes y cobertura, sin Spark:
 docker compose run --rm pipeline python -m src.ingestion.validate_files
 # Compatibilidad con el paso de descarga del plan (registra entradas locales):
@@ -82,6 +84,26 @@ Las reglas se minan a soportes 2 %, 5 % y 10 %. Se compara Apriori y FP-Growth s
 
 Copiar `.env.example` a `.env` para ajustar memoria, semilla, años y tamaños de muestra. Compose fija los caminos internos `/data/raw`, `/data/processed`, `/artifacts` y el master. Las variables de caminos sirven también para ejecución local. Después de modificar código, ejecutar `docker compose build` y recrear servicios con `docker compose up -d`.
 
+## API y aplicación React
+
+La web sigue el criterio de doble lectura. Cada módulo presenta primero una conclusión ejecutiva con indicadores y gráficos. El botón **Ver detalle técnico** abre parámetros, benchmarks, referencias exactas, tablas y limitaciones metodológicas.
+
+El navegador nunca lee los JSONL originales ni los CSV grandes. Nginx sirve la aplicación React en el puerto 8501 y reenvía `/api/*` al contenedor FastAPI. La API lee los artefactos precalculados montados en `/artifacts`, aplica filtros y devuelve únicamente datos agregados o páginas pequeñas.
+
+Rutas principales:
+
+| Ruta | Contenido |
+|---|---|
+| `/api/overview` | Resumen ejecutivo, estado y mejores configuraciones |
+| `/api/quality` | Fuentes, cobertura, nulos y esquema |
+| `/api/eda` | Agregaciones filtradas, rankings y concentración |
+| `/api/similarity` | Rejilla LSH, pares y casos interpretados |
+| `/api/ann` | Consultas, configuraciones y vecinos |
+| `/api/streaming` | Bloom, CMS, DGIM y memoria |
+| `/api/association` | Reglas filtradas, selección y benchmark |
+
+Los endpoints que exponen filas incluyen límites para evitar respuestas sin control. FastAPI publica el contrato completo en `/docs` y `/openapi.json`.
+
 El driver necesita memoria para la muestra ANN y reglas/candidatos; el Jaccard exacto crece cuadráticamente con `SAMPLE_SIZE`. No aumentar muestras sin medir. Los originales se leen por particiones Spark; los artefactos de la web contienen agregaciones y muestras, no documentos completos OCDS.
 
 ## Resultados y verificación
@@ -95,4 +117,4 @@ El driver necesita memoria para la muestra ANN y reglas/candidatos; el Jaccard e
 
 La definición académica del plan también requiere revisión humana de un caso y un enlace publicado o video. La aplicación local y el guion en `PRESENTACION.md` permiten preparar esa demostración. El pipeline no afirma haber realizado una revisión humana ni publicado una web.
 
-Documentación técnica: [Spark standalone 3.5.6](https://spark.apache.org/docs/3.5.6/spark-standalone.html), [HNSWlib](https://github.com/nmslib/hnswlib), [Streamlit](https://docs.streamlit.io/). Fuente declarada por el plan: [Registro OCDS OECE](https://data.open-contracting.org/es/publication/135).
+Documentación técnica: [Spark standalone 3.5.6](https://spark.apache.org/docs/3.5.6/spark-standalone.html), [HNSWlib](https://github.com/nmslib/hnswlib), [FastAPI](https://fastapi.tiangolo.com/) y [React](https://react.dev/). Fuente declarada por el plan: [Registro OCDS OECE](https://data.open-contracting.org/es/publication/135).
