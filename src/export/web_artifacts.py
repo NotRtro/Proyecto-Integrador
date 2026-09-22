@@ -3,7 +3,7 @@ import math
 import pandas as pd
 from src.config import ARTIFACTS, PROCESSED
 from src.common import save_json,now
-REQUIRED=['metadata/source_manifest.json','metadata/quality_summary.json','eda/filter_cube.csv','eda/rdd_dataframe_benchmark.csv','similarity/lsh_parameter_grid.csv','ann/hnsw_grid.csv','streaming/bloom_grid.csv','streaming/cms_grid.csv','streaming/dgim_grid.csv','association/rules.csv','association/selected_rules.json']
+REQUIRED=['metadata/source_manifest.json','metadata/quality_summary.json','metadata/exchange_rates.csv','eda/filter_cube.csv','eda/amount_outlier_summary.csv','eda/rdd_dataframe_benchmark.csv','similarity/lsh_parameter_grid.csv','ann/hnsw_grid.csv','streaming/bloom_grid.csv','streaming/cms_grid.csv','streaming/dgim_grid.csv','association/rules.csv','association/selected_rules.json']
 
 def run():
     missing=[p for p in REQUIRED if not (ARTIFACTS/p).is_file()]

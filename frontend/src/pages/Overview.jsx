@@ -47,7 +47,7 @@ export default function Overview() {
       </div>
     </Card>
     <Technical title="Detalle técnico de la ejecución">
-      <div className="detail-grid"><div><b>Política temporal</b><p>{q.date_policy}</p></div><div><b>Política de duplicados</b><p>{q.duplicate_policy}</p></div><div><b>Asignación a proveedores</b><p>{q.supplier_allocation}</p></div></div>
+      <div className="detail-grid"><div><b>Política temporal</b><p>{q.date_policy}</p></div><div><b>Conversión monetaria</b><p>{q.currency_policy}</p></div><div><b>Asignación a proveedores</b><p>{q.supplier_allocation}</p></div><div><b>Datos ausentes</b><p>{q.missing_amount_policy}</p></div><div><b>Valores extremos</b><p>{q.outlier_policy}</p></div><div><b>Categorías ausentes</b><p>{q.categorical_policy}</p></div></div>
       <h4>Totales anuales producidos con Spark SQL</h4><DataTable rows={data.yearly} />
       <h4>Etapas y tiempo de ejecución</h4><DataTable rows={data.run.stages} />
     </Technical>

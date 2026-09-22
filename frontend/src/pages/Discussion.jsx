@@ -13,7 +13,7 @@ export default function Discussion() {
     { técnica: 'MinHash LSH', exactitud: `F1 ${Number(l.f1).toFixed(3)}`, tiempo: `${Number(l.lsh_seconds).toFixed(3)} s`, escalabilidad: 'Alta', valor: 'Reducir pares' },
     { técnica: 'Coseno exacto', exactitud: 'Referencia', tiempo: ms(a.exact_mean_ms), escalabilidad: 'Lineal', valor: 'Vecinos exactos' },
     { técnica: 'HNSW', exactitud: `Recall ${percent(a.recall_at_10)}`, tiempo: ms(a.mean_ms), escalabilidad: 'Alta en RAM', valor: 'Consulta rápida' },
-    { técnica: 'Bloom', exactitud: 'Sin falsos negativos', tiempo: 'Microsegundos', escalabilidad: 'Flujo', valor: 'Pertenencia' },
+    { técnica: 'Bloom', exactitud: 'Sin falsos negativos', tiempo: 'Microsegundos', escalabilidad: 'Flujo', valor: 'Pertenencia' }, 
     { técnica: 'CMS', exactitud: 'Sin subestimación', tiempo: 'Microsegundos', escalabilidad: 'Flujo', valor: 'Frecuencias' },
     { técnica: 'DGIM', exactitud: 'Aproximada', tiempo: 'Microsegundos', escalabilidad: 'Flujo', valor: 'Ventana reciente' },
   ]

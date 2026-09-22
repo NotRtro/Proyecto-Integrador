@@ -138,6 +138,7 @@ def eda_technical():
         "benchmark": records(frame("eda/rdd_dataframe_benchmark.csv")),
         "plans": document("eda/execution_plans.json"),
         "amount_distribution": records(frame("eda/amount_distribution.csv")),
+        "outliers": records(frame("eda/amount_outlier_summary.csv")),
         "concentration": document("eda/concentration_metrics.json"),
     })
 

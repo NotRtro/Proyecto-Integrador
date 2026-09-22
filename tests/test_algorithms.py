@@ -1,6 +1,6 @@
 import random
 from src.processing.normalize_text import normalize_text,shingles
-from src.processing.model import effective_date,amount_pen,flatten
+from src.processing.model import effective_date,amount_pen,converted_amount,flatten
 from src.part2.exact_jaccard import jaccard
 from src.part2.minhash_lsh import signature
 from src.part4.bloom_filter import BloomFilter
@@ -24,6 +24,18 @@ def test_supplier_allocation():
     r={'ocid':'one','tender':{'datePublished':'2024-01-01'},'awards':[{'id':'a','value':{'amount':100,'currency':'PEN'},'suppliers':[{'id':'s1'},{'id':'s2'}]}]}
     flat=flatten(r,'source'); assert sum(s['allocated_amount_pen'] for s in flat['suppliers'])==100
     assert flat['processes'][0]['award_amount_pen']==100
+
+
+def test_foreign_award_uses_auditable_tender_rate():
+    r={'ocid':'usd','tender':{'datePublished':'2024-01-01','value':{'amount':100,'amount_PEN':375,'currency':'USD'}},'awards':[{'id':'a','value':{'amount':80,'currency':'USD'},'suppliers':[{'id':'s'}]}]}
+    flat=flatten(r,'source')
+    award=flat['awards'][0]; process=flat['processes'][0]
+    assert award['amount_pen']==300
+    assert award['conversion_method']=='tender_implied_rate'
+    assert award['exchange_rate']==3.75
+    assert process['award_amount_pen']==300 and process['award_converted_count']==1
+    assert flat['suppliers'][0]['allocated_amount_pen']==300
+    assert converted_amount({'amount':80,'currency':'EUR'},'USD',3.75)[0] is None
 
 def test_similarity():
     assert jaccard({'a','b'},{'b','c'})==1/3

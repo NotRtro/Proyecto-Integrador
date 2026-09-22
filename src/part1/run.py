@@ -7,7 +7,10 @@ from src.part1 import aggregations_dataframe as df_ops, aggregations_rdd as rdd_
 
 
 def run(spark):
-    df = processes(spark).cache(); df.count()
+    df = processes(spark)
+    for column in ['department', 'category', 'buyer_id', 'buyer_name', 'method', 'method_details']:
+        df = df.withColumn(column, F.coalesce(F.col(column), F.lit('NO INFORMADO')))
+    df = df.cache(); df.count()
     dims = ['year','month','department','category','buyer_id','buyer_name','competition']
     cube = df.groupBy(*dims).agg(F.count('*').alias('processes'), F.sum('tender_amount_pen').alias('tender_amount_pen'), F.sum('award_amount_pen').alias('award_amount_pen'))
     save_csv('eda/filter_cube.csv', cube.toPandas())
@@ -19,6 +22,15 @@ def run(spark):
     save_csv('eda/top_suppliers.csv', supplier_cube.groupby(['year','supplier_id','supplier_name'], dropna=False)[['allocated_amount_pen','processes']].sum().reset_index())
     save_csv('eda/buyer_supplier_counts.csv', suppliers.groupBy('year','buyer_id').agg(F.countDistinct('supplier_id').alias('unique_suppliers')).toPandas())
     save_csv('eda/amount_distribution.csv', df.groupBy('year','amount_band').count().toPandas())
+    outlier_summary = df.groupBy('year').agg(
+        F.count('*').alias('processes'),
+        F.sum(F.when(F.col('extreme_amount'), 1).otherwise(0)).alias('extreme_processes'),
+        F.sum('tender_amount_pen').alias('tender_amount_all'),
+        F.sum(F.when(~F.col('extreme_amount'), F.col('tender_amount_pen'))).alias('tender_amount_without_extremes'),
+        F.expr('percentile_approx(tender_amount_pen, 0.5)').alias('median_tender_amount'),
+        F.max('tender_amount_pen').alias('max_tender_amount'),
+    )
+    save_csv('eda/amount_outlier_summary.csv', outlier_summary.toPandas())
     metrics=[]
     for kind, data, key, value in [('buyers',cube.toPandas(),'buyer_id','award_amount_pen'),('suppliers',supplier_cube,'supplier_id','allocated_amount_pen')]:
         for year, group in data.groupby('year'):

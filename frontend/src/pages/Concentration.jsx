@@ -46,6 +46,7 @@ export default function Concentration() {
         <h4>Benchmark con resultados equivalentes</h4><DataTable rows={technical.data.benchmark} />
         <h4>Curva acumulada de entidades</h4><ExecutiveLine data={d.concentration} x="rank" lines={['share']} formatter={percent} />
         <h4>Distribución por rango de monto</h4><DataTable rows={technical.data.amount_distribution} />
+        <h4>Sensibilidad a montos extremos</h4><DataTable rows={technical.data.outliers} />
         <details className="nested-detail"><summary>Planes de ejecución Spark</summary><pre>{JSON.stringify(technical.data.plans, null, 2)}</pre></details>
       </>}
     </Technical>
