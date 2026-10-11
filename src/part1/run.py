@@ -1,66 +1,94 @@
-import time
-import statistics
+"""Parte I: EDA, concentración, RDD frente a DataFrame y particionamiento.
+
+Motor: Spark en todo el cálculo (exigido por el enunciado). Solo se traen al driver
+resultados ya agregados para escribirlos como CSV/JSON para la web.
+
+Artefactos (artifacts/eda/):
+    filter_cube.csv, supplier_cube.csv         cubos para los filtros de la web
+    *_distribution.csv, monthly_evolution.csv  distribuciones (tiempo, categoría, modalidad...)
+    amount_histogram.csv, amount_percentiles.csv, amount_outlier_summary.csv
+    sql_yearly_totals.csv                      totales anuales en Spark SQL
+    concentration_metrics.json                 HHI nacional por año (entidades y proveedores)
+    buyer_supplier_hhi.csv, buyer_hhi_summary.csv, department_supplier_hhi.csv   (Q1)
+    top_buyers.csv, top_suppliers.csv          rankings con participación
+    single_bidder_rates.csv                    tasa de postor único por dimensión (Q2)
+    rdd_dataframe_benchmark.csv, execution_plans.json, code_snippets.json
+    partitioning_experiment.json, spark_vs_pandas.csv
+"""
 from pyspark.sql import functions as F
-from src.config import PROCESSED, spark_session
-from src.common import processes, save_csv, save_json
-from src.part1 import aggregations_dataframe as df_ops, aggregations_rdd as rdd_ops
+
+from src.common import StepTimer, processes as read_processes, save_csv, save_json
+from src.config import PROCESSED, YEARS, spark_session
+from src.ingestion.validate_files import input_files
+from src.part1 import concentration, eda
+from src.part1.benchmark import run_benchmark
+from src.part1.partitioning import run_experiment
+from src.part1.spark_vs_pandas import run_comparison
+
+
+def export(name, df):
+    save_csv(f'eda/{name}.csv', df.toPandas())
 
 
 def run(spark):
-    df = processes(spark)
-    for column in ['department', 'category', 'buyer_id', 'buyer_name', 'method', 'method_details']:
-        df = df.withColumn(column, F.coalesce(F.col(column), F.lit('NO INFORMADO')))
-    df = df.cache(); df.count()
-    dims = ['year','month','department','category','buyer_id','buyer_name','competition']
-    cube = df.groupBy(*dims).agg(F.count('*').alias('processes'), F.sum('tender_amount_pen').alias('tender_amount_pen'), F.sum('award_amount_pen').alias('award_amount_pen'))
-    save_csv('eda/filter_cube.csv', cube.toPandas())
-    for name, keys in [('monthly_evolution',['year','month']), ('category_distribution',['year','category']), ('top_buyers',['year','buyer_id','buyer_name']), ('department_distribution',['year','department']), ('competition_distribution',['year','competition'])]:
-        save_csv(f'eda/{name}.csv', df.groupBy(*keys).agg(F.count('*').alias('processes'),F.sum('tender_amount_pen').alias('tender_amount_pen'),F.sum('award_amount_pen').alias('award_amount_pen')).toPandas())
-    suppliers = spark.read.parquet(str(PROCESSED/'suppliers'))
-    supplier_cube = suppliers.join(df.select('ocid','category','department','buyer_name'), 'ocid').groupBy('year','month','department','category','buyer_id','buyer_name','supplier_id','supplier_name').agg(F.sum('allocated_amount_pen').alias('allocated_amount_pen'),F.countDistinct('ocid').alias('processes')).toPandas()
-    save_csv('eda/supplier_cube.csv', supplier_cube)
-    save_csv('eda/top_suppliers.csv', supplier_cube.groupby(['year','supplier_id','supplier_name'], dropna=False)[['allocated_amount_pen','processes']].sum().reset_index())
-    save_csv('eda/buyer_supplier_counts.csv', suppliers.groupBy('year','buyer_id').agg(F.countDistinct('supplier_id').alias('unique_suppliers')).toPandas())
-    save_csv('eda/amount_distribution.csv', df.groupBy('year','amount_band').count().toPandas())
-    outlier_summary = df.groupBy('year').agg(
-        F.count('*').alias('processes'),
-        F.sum(F.when(F.col('extreme_amount'), 1).otherwise(0)).alias('extreme_processes'),
-        F.sum('tender_amount_pen').alias('tender_amount_all'),
-        F.sum(F.when(~F.col('extreme_amount'), F.col('tender_amount_pen'))).alias('tender_amount_without_extremes'),
-        F.expr('percentile_approx(tender_amount_pen, 0.5)').alias('median_tender_amount'),
-        F.max('tender_amount_pen').alias('max_tender_amount'),
-    )
-    save_csv('eda/amount_outlier_summary.csv', outlier_summary.toPandas())
-    metrics=[]
-    for kind, data, key, value in [('buyers',cube.toPandas(),'buyer_id','award_amount_pen'),('suppliers',supplier_cube,'supplier_id','allocated_amount_pen')]:
-        for year, group in data.groupby('year'):
-            v=group.groupby(key)[value].sum().sort_values(ascending=False); total=float(v.sum())
-            shares=v/total if total else v*0
-            metrics.append(dict(kind=kind,year=int(year),total=total,top10_share=float(shares.head(10).sum()),hhi=float((shares**2).sum()*10000)))
-    save_json('eda/concentration_metrics.json',metrics)
-    df.createOrReplaceTempView('process_features')
-    sql_totals=spark.sql("SELECT year, COUNT(*) AS processes, SUM(tender_amount_pen) AS tender_amount_pen, SUM(award_amount_pen) AS award_amount_pen FROM process_features GROUP BY year ORDER BY year")
-    save_csv('eda/sql_yearly_totals.csv',sql_totals.toPandas())
-    results=[]; plans={'SQL_yearly':sql_totals._jdf.queryExecution().toString()}
-    for op in ['category_amount','buyer_count']:
-        reference=None
-        for engine, module in [('DataFrame',df_ops),('RDD',rdd_ops)]:
-            begin=time.perf_counter(); query=getattr(module,op)(df); out=query.collect(); warm=time.perf_counter()-begin
-            normalized={r[0]: float(r[1] or 0) for r in out}
-            if reference is None: reference=normalized
-            else:
-                assert reference.keys()==normalized.keys()
-                assert all(abs(reference[k]-normalized[k]) <= 1e-6*max(1,abs(reference[k])) for k in reference)
-            times=[]
-            for repetition in range(3):
-                start=time.perf_counter(); getattr(module,op)(df).collect(); times.append(time.perf_counter()-start)
-            plan=query._jdf.queryExecution().toString() if engine=='DataFrame' else query.toDebugString().decode()
-            plans[f'{op}_{engine}']=plan
-            results.append(dict(operation=op,engine=engine,warmup_seconds=warm,median_seconds=statistics.median(times),run1=times[0],run2=times[1],run3=times[2],partitions=df.rdd.getNumPartitions(),shuffle='Exchange / reduceByKey',equivalent=True))
-    save_csv('eda/rdd_dataframe_benchmark.csv',results); save_json('eda/execution_plans.json',plans)
-    df.unpersist()
+    timer = StepTimer()
+    processes = eda.with_informed_categories(read_processes(spark)).cache()
+    raw_suppliers = spark.read.parquet(str(PROCESSED / 'suppliers'))
+    suppliers = concentration.supplier_frame(raw_suppliers, processes).cache()
+    processes.count()
+    suppliers.count()
+
+    with timer.step('EDA y cubos'):
+        export('filter_cube', eda.filter_cube(processes))
+        for name, df in eda.distributions(processes).items():
+            export(name, df)
+        export('sql_yearly_totals', eda.yearly_totals_sql(spark, processes))
+        export('amount_histogram', eda.amount_histogram(processes))
+        export('amount_percentiles', eda.amount_percentiles(processes))
+        export('amount_outlier_summary', eda.amount_outliers(processes))
+        export('single_bidder_rates', eda.single_bidder_rates(processes))
+        # La categoría viene del proceso; se agrega aquí porque supplier_frame solo trae contexto geográfico.
+        suppliers_with_category = suppliers.join(processes.select('ocid', 'category'), 'ocid', 'left')
+        supplier_cube = (suppliers_with_category
+                         .groupBy('year', 'month', 'department', 'category', 'buyer_id', 'buyer_name',
+                                  'supplier_id', 'supplier_name', 'supplier_type')
+                         .agg(F.sum('allocated_amount_pen').alias('allocated_amount_pen'),
+                              F.countDistinct('ocid').alias('processes')))
+        export('supplier_cube', supplier_cube)
+
+    with timer.step('concentración (Q1)'):
+        market = concentration.market_concentration(processes, suppliers).toPandas()
+        save_json('eda/concentration_metrics.json', market.to_dict(orient='records'))
+        buyer_hhi = concentration.buyer_supplier_concentration(suppliers).cache()
+        export('buyer_supplier_hhi', buyer_hhi)
+        export('buyer_hhi_summary', concentration.buyer_hhi_summary(buyer_hhi))
+        export('department_supplier_hhi', concentration.department_supplier_concentration(suppliers))
+        export('top_buyers', concentration.top_rankings(processes, ['year'], 'buyer_id', ['buyer_name', 'buyer_level'],
+                                                        'award_amount_pen'))
+        export('top_suppliers', concentration.top_rankings(suppliers, ['year'], 'supplier_id',
+                                                           ['supplier_name', 'supplier_type'], 'allocated_amount_pen'))
+        buyer_hhi.unpersist()
+
+    with timer.step('RDD frente a DataFrame'):
+        # Las operaciones del benchmark hacen su propio join con el departamento: tabla original.
+        results, plans, snippets = run_benchmark(processes, raw_suppliers)
+        save_csv('eda/rdd_dataframe_benchmark.csv', results)
+        save_json('eda/execution_plans.json', plans)
+        save_json('eda/code_snippets.json', snippets)
+
+    processes.unpersist()
+    suppliers.unpersist()
+    with timer.step('experimento de particionamiento'):
+        save_json('eda/partitioning_experiment.json',
+                  run_experiment(spark, [str(p) for p in input_files()], YEARS[len(YEARS) // 2]))
+    with timer.step('Spark frente a pandas'):
+        save_csv('eda/spark_vs_pandas.csv', run_comparison(spark))
+    save_json('eda/part1_timings.json', timer.steps)
+
 
 if __name__ == '__main__':
-    s=spark_session()
-    try: run(s)
-    finally: s.stop()
+    session = spark_session()
+    try:
+        run(session)
+    finally:
+        session.stop()
