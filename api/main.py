@@ -123,6 +123,7 @@ def quality():
             "schema": document("metadata/analytical_schema.json"),
             "stopwords": optional_document("metadata/domain_stopwords.json"),
             "processing_timings": optional_document("metadata/processing_timings.json", []),
+            "decisions": optional_document("metadata/data_decisions.json"),
         }
     )
 

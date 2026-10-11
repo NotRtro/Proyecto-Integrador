@@ -1,6 +1,7 @@
 import { api, integer, percent } from '../api'
 import { Card, DataTable, ErrorState, ExecutiveBar, FindingModule, Loading, SectionHeader, Stat, Technical } from '../components'
 import { useAsync, useMeta } from '../hooks'
+import Decisions from './Decisions'
 
 const LEVELS = { local: 'Local', regional: 'Regional', nacional: 'Nacional', empresa_publica: 'Empresa pública', otro: 'Otro' }
 const SUPPLIERS = { persona_juridica: 'Persona jurídica', persona_natural: 'Persona natural', consorcio: 'Consorcio', extranjero: 'Extranjero', otro: 'Otro' }
@@ -54,6 +55,8 @@ export default function Data() {
         <Card title="Tipo de proveedor" subtitle="Por prefijo del RUC; los consorcios ocultan a sus integrantes"><DataTable rows={suppliers.map(r => ({ tipo: r.type, identificadores: r.ids, adjudicaciones: r.rows, 'monto atribuido': percent(r.amount_share) }))} /></Card>
       </div>
     </FindingModule>
+
+    <Decisions d={data.decisions} />
 
     <Technical title="Decisiones de limpieza, esquema y tiempos">
       <div className="detail-grid">

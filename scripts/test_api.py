@@ -35,6 +35,7 @@ assert all(overview["validation"]["checks"].values())
 
 quality = get("/api/quality")
 assert len(quality["sources"]) == meta["source"]["files"] >= 1 and quality["stopwords"]["terms"]
+assert quality["decisions"]["tasks"], "falta la tabla de decisiones de volumen"
 
 options = get("/api/eda/options")
 assert set(years).issubset(set(options["year"])) and options["modality"]
