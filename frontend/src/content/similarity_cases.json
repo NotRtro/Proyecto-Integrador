@@ -1,0 +1,4 @@
+{
+  "instrucciones": "Casos de similitud revisados por el equipo. Tomar pares de artifacts/similarity/case_candidates.json, buscarlos en SEACE por su nomenclatura (left_tender_code / right_tender_code), y completar 'interpretacion' y 'limitacion' con lo verificado. Cambiar 'estado' a 'validado' solo después de revisar el expediente.",
+  "casos": []
+}

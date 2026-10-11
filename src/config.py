@@ -5,8 +5,7 @@ PROCESSED = Path(os.getenv('PROCESSED_PATH', 'data/processed'))
 ARTIFACTS = Path(os.getenv('ARTIFACTS_PATH', 'artifacts'))
 YEARS = [int(x) for x in os.getenv('ANALYSIS_YEARS', '2023,2024,2025').split(',')]
 SEED = int(os.getenv('RANDOM_SEED', '42'))
-SAMPLE = int(os.getenv('SAMPLE_SIZE', '600'))
-ANN_SAMPLE = int(os.getenv('ANN_SAMPLE_SIZE', '5000'))
+SAMPLE = int(os.getenv('SAMPLE_SIZE', '1500'))
 APRIORI_SAMPLE = int(os.getenv('APRIORI_SAMPLE_SIZE', '10000'))
 
 

@@ -1,55 +1,107 @@
-import itertools
+"""Parte II: similitud de requerimientos con shingles, Jaccard, MinHash y LSH.
+
+Motor: Spark para el corpus completo (firmas, buckets, candidatos, verificación y Q3);
+el driver solo calcula la verdad exacta de la muestra de evaluación (ver evaluation.py).
+
+Representación (justificación en methodology.json): cada proceso es el conjunto de
+shingles de 2 palabras de la descripción del requerimiento y sus ítems, sin la
+nomenclatura del proceso y sin stopwords de dominio (src/processing/text_features.py).
+Se usa MinHash y no SimHash porque la pregunta es de solapamiento de conjuntos
+(Jaccard): SimHash aproxima la similitud coseno de vectores ponderados.
+
+Artefactos (artifacts/similarity/):
+    minhash_error.csv, minhash_scatter.csv   Jaccard estimado frente a exacto según k (II-01)
+    lsh_parameter_grid.csv, s_curve_observed.csv, similar_pairs.csv, documents.csv
+    full_corpus_summary.json, template_groups.csv        LSH sobre todo el corpus (II-02)
+    repeated_requirements.parquet, repeated_summary.csv, repeated_top_buyers.csv (Q3)
+    case_candidates.json, methodology.json
+"""
 import json
-from pathlib import Path
-import time
-from src.config import SAMPLE, SEED, spark_session
-from src.common import sample_processes, save_csv, save_json
-from src.part2.exact_jaccard import jaccard
-from src.part2.minhash_lsh import signature, band_keys
+
+import pandas as pd
+
+from src.common import StepTimer, features as read_features, processes as read_processes, save_csv, save_json
+from src.config import ARTIFACTS, SAMPLE, SEED, spark_session
+from src.part2 import full_corpus, repeated
+from src.part2.evaluation import ERROR_HASHES, MAX_HASHES, THRESHOLDS, evaluate
+from src.processing.text_features import DOMAIN_STOPWORD_DF, SHINGLE_WIDTH
+
+PAIR_COLUMNS = ['config', 'left_ocid', 'right_ocid', 'jaccard', 'status', 'left_year', 'right_year',
+                'left_category', 'right_category', 'same_buyer']
+
+
+def save_evaluation(result):
+    save_csv('similarity/minhash_error.csv', result['error'])
+    save_csv('similarity/minhash_scatter.csv', result['scatter'])
+    save_csv('similarity/lsh_parameter_grid.csv', result['grid'])
+    save_csv('similarity/precision_recall_curve.csv', result['grid'])
+    save_csv('similarity/s_curve_observed.csv', result['curve'])
+    pairs = pd.DataFrame(result['pairs'], columns=PAIR_COLUMNS)
+    save_csv('similarity/similar_pairs.csv', pairs)
+    save_csv('similarity/false_positives.csv', pairs[pairs.status == 'FP'])
+    save_csv('similarity/false_negatives.csv', pairs[pairs.status == 'FN'])
+    save_csv('similarity/documents.csv', result['data'][['ocid', 'year', 'category', 'buyer_id', 'text']])
+
+
+def methodology(result, summary):
+    truth = {row['threshold']: row['truth_pairs'] for row in result['grid'] if row['hashes'] == 128 and row['rows'] == 4}
+    return dict(
+        representation=f'Shingles de {SHINGLE_WIDTH} palabras de la descripción del requerimiento y sus ítems; '
+                       'sin la nomenclatura del proceso (tender_code) ni stopwords de dominio '
+                       f'(frecuencia documental > {DOMAIN_STOPWORD_DF:.0%}).',
+        why_minhash='La pregunta es de solapamiento de conjuntos de palabras (Jaccard). SimHash aproxima la similitud '
+                    'coseno de vectores ponderados; para eso está la Parte III (TF-IDF).',
+        sample=dict(method='Entidades completas elegidas por SHA-256(buyer_id + semilla); ninguna aporta más del 20 %.',
+                    size=len(result['data']), buyers=result['buyers'], seed=SEED, truth_pairs_by_threshold=truth),
+        minhash=dict(hashes=ERROR_HASHES, max_hashes=MAX_HASHES, hash_family='(a·x + b) mod (2^31 - 1)',
+                     error='Ĵ = proporción de componentes iguales; error estándar teórico sqrt(J(1-J)/k).'),
+        lsh=dict(metric='Precisión y recall de los candidatos LSH antes de verificar con Jaccard exacto.',
+                 thresholds=THRESHOLDS),
+        full_corpus=summary,
+        timings=dict(result['timings'], note='La verdad exacta (X·Xᵀ disperso) y las firmas de la muestra se calculan '
+                                             'en el driver; los candidatos LSH de la rejilla, en Spark.'),
+    )
 
 
 def run(spark):
-    data=sample_processes(spark,SAMPLE)
-    data=data[data.shingles.map(len)>0].reset_index(drop=True)
-    if len(data)<2: raise ValueError('LSH requiere al menos dos textos')
-    sets=[set(x) for x in data.shingles]
-    start=time.perf_counter()
-    exact={(i,j):jaccard(sets[i],sets[j]) for i in range(len(data)) for j in range(i+1,len(data))}
-    exact_time=time.perf_counter()-start
-    signatures=spark.sparkContext.parallelize(list(enumerate(data.shingles.tolist()))).map(lambda r:(r[0],signature(r[1],128,SEED))).cache()
-    signatures.count()
-    grid=[]; pairs=[]
-    for hashes in [32,64,128]:
-        for rows in [2,4,8]:
-            bands=hashes//rows
-            start=time.perf_counter()
-            candidates=set(signatures.flatMap(lambda r:band_keys(r,bands,rows)).groupByKey().flatMap(lambda kv:itertools.combinations(sorted(set(kv[1])),2)).distinct().collect())
-            elapsed=time.perf_counter()-start
-            for threshold in [.5,.6,.7,.8]:
-                truth={p for p,v in exact.items() if v>=threshold}
-                tp=len(candidates&truth); fp=len(candidates-truth); fn=len(truth-candidates)
-                precision=tp/len(candidates) if candidates else 0.; recall=tp/len(truth) if truth else 0.
-                config=f'h{hashes}_b{bands}_r{rows}_t{threshold}'
-                grid.append(dict(config=config,hashes=hashes,bands=bands,rows=rows,threshold=threshold,precision=precision,recall=recall,f1=2*precision*recall/(precision+recall) if precision+recall else 0,tp=tp,fp=fp,fn=fn,candidates=len(candidates),exact_seconds=exact_time,lsh_seconds=elapsed,sample_size=len(data),truth_pairs=len(truth)))
-                # Every evaluated positive/candidate is retained, with exact verification.
-                for i,j in sorted(candidates|truth):
-                    status='TP' if (i,j) in candidates&truth else 'FP' if (i,j) in candidates else 'FN'
-                    pairs.append(dict(config=config,left_ocid=data.iloc[i].ocid,right_ocid=data.iloc[j].ocid,jaccard=exact[i,j],status=status,left_year=int(data.iloc[i].year),right_year=int(data.iloc[j].year),left_category=data.iloc[i].category,right_category=data.iloc[j].category))
-    signatures.unpersist()
-    save_csv('similarity/lsh_parameter_grid.csv',grid); save_csv('similarity/precision_recall_curve.csv',grid)
-    columns=['config','left_ocid','right_ocid','jaccard','status','left_year','right_year','left_category','right_category']
-    save_csv('similarity/similar_pairs.csv',pairs,columns)
-    save_csv('similarity/false_positives.csv',[p for p in pairs if p['status']=='FP'],columns)
-    save_csv('similarity/false_negatives.csv',[p for p in pairs if p['status']=='FN'],columns)
-    save_csv('similarity/documents.csv',data[['ocid','year','category','text']])
-    notes=json.loads(Path(__file__).with_name('case_notes.json').read_text())
-    ids=set(data.ocid)
-    notes['cases']=[c for c in notes['cases'] if c['left_ocid'] in ids and c['right_ocid'] in ids]
-    notes['suggested_cases']=sorted(pairs,key=lambda x:-x['jaccard'])[:3]
-    save_json('similarity/reviewed_cases.json',notes)
-    save_json('similarity/methodology.json',{'sample':'Menores SHA256(ocid + semilla), reproducible', 'seed':SEED,'size':len(data),'representation':'Shingles de dos palabras; fallback tokens para textos cortos','metric':'Precisión y recall de candidatos antes de verificación exacta; umbrales con cero pares verdaderos no son evidencia de recuperación','exact_seconds':exact_time})
+    timer = StepTimer()
+    features = read_features(spark).cache()
+    processes = read_processes(spark)
+
+    with timer.step('evaluación en muestra (MinHash y rejilla LSH)'):
+        result = evaluate(spark, features, SAMPLE)
+        save_evaluation(result)
+
+    with timer.step('LSH sobre el corpus completo'):
+        summary, similar, template_groups, cached = full_corpus.run_full_corpus(spark, features)
+        save_csv('similarity/template_groups.csv', template_groups.assign(years=template_groups.years.map(sorted)))
+
+    with timer.step('requerimientos repetidos (Q3)'):
+        pairs = repeated.classify(similar, processes).cache()
+        (ARTIFACTS / 'similarity').mkdir(parents=True, exist_ok=True)
+        pairs.toPandas().to_parquet(ARTIFACTS / 'similarity' / 'repeated_requirements.parquet', index=False)
+        save_csv('similarity/repeated_summary.csv', repeated.summary(pairs).toPandas())
+        save_csv('similarity/repeated_top_buyers.csv', repeated.top_buyers(pairs).toPandas())
+        save_json('similarity/case_candidates.json', dict(
+            note='Pares propuestos para revisión en SEACE (buscar por la nomenclatura tender_code). '
+                 'El equipo copia los revisados a frontend/src/content/similarity_cases.json con su interpretación.',
+            cases=repeated.case_candidates(pairs, features)))
+        pairs.unpersist()
+
+    # Compatibilidad con la API actual: los casos interpretados los escribe el equipo en
+    # frontend/src/content/similarity_cases.json (paso 8.7); aquí no se inventan.
+    save_json('similarity/reviewed_cases.json', dict(cases=[], review_type='Pendiente de revisión humana'))
+    save_json('similarity/methodology.json', methodology(result, summary))
+    save_json('similarity/part2_timings.json', timer.steps)
+    for df in cached + [features]:
+        df.unpersist()
+    print(json.dumps({k: summary[k] for k in ['documents', 'possible_pairs', 'candidate_pairs', 'similar_pairs']}),
+          flush=True)
+
 
 if __name__ == '__main__':
-    s=spark_session()
-    try: run(s)
-    finally: s.stop()
+    session = spark_session()
+    try:
+        run(session)
+    finally:
+        session.stop()
