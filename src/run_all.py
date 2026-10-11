@@ -1,3 +1,11 @@
+"""Orquestador del pipeline completo (etapas en orden, con manifiesto de la corrida).
+
+Opciones de volumen y tiempo (docs/DecisionesTecnicas.md):
+    --profile completo|rapido   rapido evalúa ANN sobre 50 mil procesos; Q1-Q3 siempre con todo
+    --experiments si|no|auto    mediciones de una vez: repetir, omitir o solo si faltan
+    --refresh                   ignorar las cachés de validación y de staging
+"""
+
 import argparse
 import hashlib
 import importlib
@@ -9,7 +17,18 @@ import traceback
 from pathlib import Path
 
 from src.common import now, save_json
-from src.config import APRIORI_SAMPLE, SAMPLE, SEED, YEARS, spark_session
+from src.config import (
+    APRIORI_SAMPLE,
+    EXPERIMENT_MODES,
+    PROFILES,
+    SAMPLE,
+    SEED,
+    YEARS,
+    experiments_mode,
+    profile_settings,
+    run_profile,
+    spark_session,
+)
 
 
 def main():
@@ -19,7 +38,21 @@ def main():
         choices=['validation', 'processing', 'part1', 'part2', 'part3', 'part4', 'part5', 'export'],
         default='validation',
     )
+    parser.add_argument(
+        '--profile', choices=list(PROFILES), help='Perfil de ejecución (por defecto RUN_PROFILE o completo)'
+    )
+    parser.add_argument(
+        '--experiments', choices=EXPERIMENT_MODES, help='Mediciones de una vez (por defecto según el perfil)'
+    )
+    parser.add_argument('--refresh', action='store_true', help='Ignorar las cachés de validación y staging')
     args = parser.parse_args()
+    # Las etapas leen estas opciones del entorno en tiempo de ejecución (src/config.py).
+    if args.profile:
+        os.environ['RUN_PROFILE'] = args.profile
+    if args.experiments:
+        os.environ['RUN_EXPERIMENTS'] = args.experiments
+    if args.refresh:
+        os.environ['RUN_REFRESH'] = '1'
     stages = (
         [('validation', 'src.ingestion.validate_files'), ('processing', 'src.processing.build_processes')]
         + [(f'part{i}', f'src.part{i}.run') for i in range(1, 6)]
@@ -45,6 +78,10 @@ def main():
         seed=SEED,
         sample_size=SAMPLE,
         apriori_sample=APRIORI_SAMPLE,
+        profile=run_profile(),
+        profile_settings=profile_settings(),
+        experiments=experiments_mode(),
+        refresh=os.getenv('RUN_REFRESH') == '1',
         stages=[],
     )
     spark = None

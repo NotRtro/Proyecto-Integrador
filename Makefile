@@ -1,4 +1,4 @@
-.PHONY: all build up download run test down dev-sample dev static
+.PHONY: all build up download run rapido test down dev-sample dev static
 all: build up download run
 build:
 	CODE_VERSION=$$(git rev-parse --short HEAD) docker compose build
@@ -8,6 +8,9 @@ download:
 	docker compose run --rm --no-deps pipeline python -m src.ingestion.download
 run:
 	docker compose run --rm pipeline python -m src.run_all
+# Corrida de trabajo: ANN sobre 50 mil procesos y mediciones reutilizadas (docs/DecisionesTecnicas.md).
+rapido:
+	docker compose run --rm pipeline python -m src.run_all --profile rapido
 test:
 	docker compose run --rm --no-deps -e SPARK_MASTER_URL='local[2]' -e SPARK_DRIVER_HOST= pipeline python -m pytest -q
 	docker compose up -d --wait api web

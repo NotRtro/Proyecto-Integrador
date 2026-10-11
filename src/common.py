@@ -4,7 +4,7 @@ import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
-from src.config import ARTIFACTS, PROCESSED, SEED
+from src.config import ARTIFACTS, PROCESSED, SEED, experiments_mode, run_profile
 
 
 def now():
@@ -65,3 +65,33 @@ def sample_processes(spark, n):
     from pyspark.sql import functions as F
 
     return features(spark).orderBy(F.sha2(F.concat(F.col('ocid'), F.lit(str(SEED))), 256)).limit(n).toPandas()
+
+
+EXPERIMENTS_REGISTRY = 'metadata/experiments.json'
+
+
+def experiment(name, artifacts, measure):
+    """Corre una medición de una vez (benchmark, escalamiento...) o reutiliza la guardada.
+
+    Las mediciones no responden Q1-Q3: comparan motores o algoritmos. Repetirlas en cada
+    corrida cuesta minutos sin cambiar la conclusión, así que según RUN_EXPERIMENTS
+    se repiten ('si'), se omiten ('no') o se corren solo si faltan sus artefactos ('auto').
+    El registro dice cuándo, con qué perfil y con qué versión del código se midió cada una.
+    """
+    path = ARTIFACTS / EXPERIMENTS_REGISTRY
+    registry = json.loads(path.read_text(encoding='utf-8')) if path.is_file() else {}
+    mode = experiments_mode()
+    available = all((ARTIFACTS / a).is_file() for a in artifacts)
+    entry = registry.get(name, {})
+    if mode == 'no' or (mode == 'auto' and available):
+        entry.update(last_run=now(), last_status='reutilizado' if available else 'omitido: no hay medición previa')
+        print(f'  experimento {name}: {entry["last_status"]}', flush=True)
+        measured = False
+    else:
+        measure()
+        entry = dict(measured_at=now(), profile=run_profile(), code_version=os.getenv('CODE_VERSION', 'uncommitted'),
+                     artifacts=artifacts, last_run=now(), last_status='medido')
+        measured = True
+    registry[name] = entry
+    save_json(EXPERIMENTS_REGISTRY, registry)
+    return measured

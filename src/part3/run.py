@@ -21,9 +21,9 @@ import numpy as np
 import pandas as pd
 from pyspark.sql import functions as F
 
-from src.common import StepTimer, save_csv, save_json
+from src.common import StepTimer, experiment, save_csv, save_json
 from src.common import features as read_features
-from src.config import ARTIFACTS, SEED, spark_session
+from src.config import ARTIFACTS, SEED, profile_settings, run_profile, spark_session
 from src.part3.indexes import ann_search, bootstrap_ci, build_hnsw, build_ivf, exact_search, index_bytes, recall_at
 from src.part3.vectors import build_vectors
 
@@ -33,11 +33,6 @@ DISPLAY_QUERIES = 40
 SCALING_SIZES = [5_000, 20_000, 50_000, 100_000]
 SCALING_HNSW = dict(m=16, ef_construction=128, ef_search=64)
 SCALING_NPROBE = 16
-HNSW_M = [8, 16, 32]
-HNSW_EF_CONSTRUCTION = [64, 128]
-HNSW_EF_SEARCH = [16, 32, 64, 128]
-IVF_NLIST = [64, 256, 1024]
-IVF_NPROBE = [1, 4, 16, 64]
 TARGET_RECALL = 0.95
 PART2_PAIRS = 300
 
@@ -103,11 +98,12 @@ def scaling(vectors, queries):
 
 def hnsw_grid(vectors, queries, exact, exact_mean):
     rows, found_by_config = [], {}
-    for m in HNSW_M:
-        for ef_construction in HNSW_EF_CONSTRUCTION:
+    settings = profile_settings()
+    for m in settings['hnsw_m']:
+        for ef_construction in settings['hnsw_ef_construction']:
             index, build = build_hnsw(vectors, m, ef_construction)
             size = index_bytes(index)
-            for ef_search in HNSW_EF_SEARCH:
+            for ef_search in settings['hnsw_ef_search']:
                 index.hnsw.efSearch = ef_search
                 found, latencies = ann_search(index, vectors, queries, K)
                 config = f'M{m}_efC{ef_construction}_efS{ef_search}'
@@ -134,10 +130,11 @@ def hnsw_grid(vectors, queries, exact, exact_mean):
 
 def ivf_grid(vectors, queries, exact, exact_mean):
     rows, found_by_config = [], {}
-    for nlist in IVF_NLIST:
+    settings = profile_settings()
+    for nlist in settings['ivf_nlist']:
         index, build = build_ivf(vectors, nlist, SEED)
         size = index_bytes(index)
-        for nprobe in IVF_NPROBE:
+        for nprobe in settings['ivf_nprobe']:
             index.nprobe = nprobe
             found, latencies = ann_search(index, vectors, queries, K)
             config = f'IVF{nlist}_nprobe{nprobe}'
@@ -220,13 +217,15 @@ def run(spark):
     timer = StepTimer()
     with timer.step('lectura y vectorización TF-IDF + SVD'):
         # Orden pseudoaleatorio reproducible: los prefijos del arreglo son submuestras aleatorias.
-        data = (
+        # El perfil rápido evalúa ANN sobre un prefijo de ese orden (docs/DecisionesTecnicas.md).
+        ordered = (
             read_features(spark)
             .filter(F.length('normalized_text') > 0)
             .select('ocid', 'normalized_text', 'text', 'year', 'category')
             .orderBy(F.sha2(F.concat(F.col('ocid'), F.lit(str(SEED))), 256))
-            .toPandas()
         )
+        limit = profile_settings()['ann_max_corpus']
+        data = (ordered.limit(limit) if limit else ordered).toPandas()
         vectors, info = build_vectors(data.normalized_text)
         keep = np.linalg.norm(vectors, axis=1) > 0
         vectors, data = vectors[keep], data[keep].reset_index(drop=True)
@@ -235,7 +234,10 @@ def run(spark):
     queries = rng.choice(min(SCALING_SIZES[0], len(vectors)), size=min(QUERIES, len(vectors) - 1), replace=False)
 
     with timer.step('escalamiento'):
-        save_csv('ann/scaling.csv', scaling(vectors, queries))
+        # Medición de una vez: se repite o se reutiliza según RUN_EXPERIMENTS (src/common.py).
+        experiment(
+            'escalamiento_ann', ['ann/scaling.csv'], lambda: save_csv('ann/scaling.csv', scaling(vectors, queries))
+        )
     with timer.step('búsqueda exacta (referencia)'):
         exact, exact_latencies = exact_search(vectors, queries, K)
     with timer.step('rejilla HNSW'):
@@ -261,6 +263,8 @@ def run(spark):
         'ann/methodology.json',
         dict(
             vectors=info,
+            profile=run_profile(),
+            corpus_size=len(vectors),
             queries=len(queries),
             k=K,
             target_recall=TARGET_RECALL,
