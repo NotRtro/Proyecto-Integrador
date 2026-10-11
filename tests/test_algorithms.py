@@ -142,3 +142,24 @@ def test_procurement_modality_groups_variants():
     assert procurement_modality('Licitación Pública') == 'Licitación Pública'
     assert procurement_modality('Comparación de Precios') == 'Comparación de Precios'
     assert procurement_modality('Contratos Estandarizados') == 'Otra' and procurement_modality(None) is None
+
+
+def test_experiment_registry_reuses_or_measures(tmp_path, monkeypatch):
+    from src import common
+
+    monkeypatch.setattr(common, 'ARTIFACTS', tmp_path)
+    calls = []
+
+    def measure():
+        calls.append(1)
+        (tmp_path / 'x.csv').write_text('a\n1\n')
+
+    monkeypatch.setenv('RUN_EXPERIMENTS', 'auto')
+    assert common.experiment('demo', ['x.csv'], measure) and len(calls) == 1  # falta: se mide
+    assert not common.experiment('demo', ['x.csv'], measure) and len(calls) == 1  # existe: se reutiliza
+    monkeypatch.setenv('RUN_EXPERIMENTS', 'si')
+    assert common.experiment('demo', ['x.csv'], measure) and len(calls) == 2
+    import json
+
+    registry = json.loads((tmp_path / 'metadata/experiments.json').read_text(encoding='utf-8'))
+    assert registry['demo']['last_status'] == 'medido' and registry['demo']['profile'] == 'completo'

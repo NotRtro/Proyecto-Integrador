@@ -91,6 +91,18 @@ def test_ocds_to_partitioned_parquet(tmp_path, monkeypatch):
         )
         suppliers = spark.read.parquet(str(tmp_path / 'processed' / 'suppliers')).collect()
         assert len(suppliers) == 4 and sum(r.allocated_amount_pen for r in suppliers) == 428
+
+        # Caché de staging: sin cambios no se vuelve a parsear; con RUN_REFRESH sí. Cada
+        # escritura de Spark crea archivos con un UUID nuevo, así que los nombres lo delatan.
+        def staging_files():
+            return sorted(p.name for p in (tmp_path / 'processed' / 'staging').glob('*.parquet'))
+
+        before = staging_files()
+        build.stage_raw_records(spark).count()
+        assert staging_files() == before
+        monkeypatch.setenv('RUN_REFRESH', '1')
+        build.stage_raw_records(spark).count()
+        assert staging_files() != before
     finally:
         spark.stop()
 

@@ -22,12 +22,16 @@ metadata/quality_summary.json, metadata/nulls_by_year.csv, metadata/exchange_rat
 metadata/analytical_schema.json.
 """
 
+import hashlib
+import json
+import sys
+
 from pyspark.sql import Window
 from pyspark.sql import functions as F
 from pyspark.sql.types import ArrayType, BooleanType, DoubleType, LongType, StringType, StructField, StructType
 
 from src.common import StepTimer, save_csv, save_json
-from src.config import PROCESSED, YEARS, spark_session
+from src.config import PROCESSED, YEARS, refresh_requested, spark_session
 from src.ingestion.json_records import decode_line
 from src.ingestion.validate_files import input_files
 from src.processing.model import flatten
@@ -151,14 +155,48 @@ def parse(row):
     return rows
 
 
+# Módulos cuyo código decide el contenido del staging: si cambian, hay que volver a parsear.
+STAGING_CODE = [
+    'src.ingestion.json_records',
+    'src.processing.model',
+    'src.processing.entity_level',
+    'src.processing.normalize_text',
+    __name__,
+]
+
+
+def staging_fingerprint(files):
+    """Huella de los archivos fuente (nombre, tamaño, fecha) y del código que los parsea."""
+    digest = hashlib.sha256()
+    for path in files:
+        stat = path.stat()
+        digest.update(f'{path.name}:{stat.st_size}:{stat.st_mtime_ns}'.encode())
+    for module in STAGING_CODE:
+        with open(sys.modules[module].__file__, 'rb') as source:
+            digest.update(source.read())
+    return digest.hexdigest()
+
+
 def stage_raw_records(spark):
-    """Parsea el JSON una sola vez y lo deja en Parquet."""
-    paths = [str(p.resolve()) for p in input_files()]
+    """Parsea el JSON una sola vez y lo deja en Parquet; lo reutiliza si nada cambió.
+
+    El parseo es la subetapa más cara (~2-3 min). Si los archivos y el código del parseo
+    son los mismos de la corrida anterior, el Parquet ya escrito es idéntico: se reutiliza.
+    """
+    files = input_files()
+    path = str(PROCESSED / 'staging')
+    marker = PROCESSED / 'staging_fingerprint.json'
+    current = staging_fingerprint(files)
+    if not refresh_requested() and marker.is_file() and (PROCESSED / 'staging').is_dir():
+        if json.loads(marker.read_text(encoding='utf-8')).get('fingerprint') == current:
+            print('  staging sin cambios: se reutiliza el Parquet', flush=True)
+            return spark.read.parquet(path)
+    paths = [str(p.resolve()) for p in files]
     partitions = int(spark.conf.get('spark.default.parallelism', '8')) * 2
     raw = spark.read.text(paths).withColumn('source_file', F.input_file_name()).repartition(partitions)
     staged = spark.createDataFrame(raw.rdd.flatMap(parse), staging_schema())
-    path = str(PROCESSED / 'staging')
     staged.write.mode('overwrite').parquet(path)
+    marker.write_text(json.dumps(dict(fingerprint=current)), encoding='utf-8')
     return spark.read.parquet(path)
 
 

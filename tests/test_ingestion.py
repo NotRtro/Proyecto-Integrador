@@ -31,3 +31,21 @@ def test_provenance_uses_download_manifest(tmp_path):
     }
     assert validate_files.provenance(path, downloads)['source_url'] == 'https://example.org/2023'
     assert validate_files.provenance(tmp_path / 'otro.jsonl', downloads)['downloaded_at'] is None
+
+
+def test_validation_reuses_manifest_when_files_unchanged(tmp_path, monkeypatch):
+    from src import common
+
+    raw, artifacts = tmp_path / 'raw', tmp_path / 'artifacts'
+    raw.mkdir()
+    (raw / 'peru_oece_bulk_2024.jsonl').write_text('{"ocid": "a", "tender": {"datePublished": "2024-01-01"}}\n')
+    for module in (validate_files, common):
+        monkeypatch.setattr(module, 'ARTIFACTS', artifacts)
+    monkeypatch.setattr(validate_files, 'RAW', raw)
+    first = validate_files.run()
+    calls = []
+    monkeypatch.setattr(validate_files, 'scan', lambda *a: calls.append(a))
+    assert validate_files.run() == first and not calls  # sin cambios: no se vuelve a leer
+    # Si el archivo cambia (tamaño distinto), se valida de nuevo.
+    (raw / 'peru_oece_bulk_2024.jsonl').write_text('{"ocid": "b", "tender": {"datePublished": "2024-01-01"}}\n\n')
+    assert validate_files.cached_manifest(validate_files.input_files()) is None

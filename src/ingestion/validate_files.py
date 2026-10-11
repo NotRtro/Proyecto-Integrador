@@ -17,7 +17,7 @@ import json
 from collections import Counter
 
 from src.common import now, save_csv, save_json
-from src.config import RAW
+from src.config import ARTIFACTS, RAW, refresh_requested
 from src.ingestion.download import LICENSE, MANIFEST, SOURCE_PAGE
 from src.ingestion.json_records import decode_line
 from src.processing.model import effective_date
@@ -107,17 +107,42 @@ def scan(path, schema):
     return stats, repairs, years, min_date, max_date
 
 
+def fingerprint(path):
+    stat = path.stat()
+    return dict(file=path.name, bytes=stat.st_size, mtime_ns=stat.st_mtime_ns)
+
+
+def cached_manifest(paths):
+    """Manifiesto anterior si los archivos son los mismos (nombre, tamaño y fecha); si no, None.
+
+    Validar relee y vuelve a calcular el SHA-256 de ~3 GB en cada corrida (casi 2 min).
+    Si los archivos no cambiaron, ese trabajo da el mismo resultado: se reutiliza.
+    """
+    path = ARTIFACTS / 'metadata/source_manifest.json'
+    needed = ['metadata/schema.json', 'metadata/temporal_coverage.csv']
+    if refresh_requested() or not path.is_file() or not all((ARTIFACTS / n).is_file() for n in needed):
+        return None
+    previous = json.loads(path.read_text(encoding='utf-8'))
+    current = [fingerprint(p) for p in paths]
+    recorded = [dict(file=x['file'], bytes=x['bytes'], mtime_ns=x.get('mtime_ns')) for x in previous]
+    return previous if current == recorded else None
+
+
 def run():
+    paths = input_files()
+    cached = cached_manifest(paths)
+    if cached is not None:
+        print('Archivos sin cambios desde la última validación: se reutiliza el manifiesto', flush=True)
+        return cached
     downloads = json.loads((RAW / MANIFEST).read_text(encoding='utf-8')) if (RAW / MANIFEST).is_file() else {}
     manifest, coverage, schema = [], [], {}
-    for path in input_files():
+    for path in paths:
         print(f'Validando {path.name}', flush=True)
         stats, repairs, years, min_date, max_date = scan(path, schema)
         save_json(f'metadata/repairs_{path.name}.json', repairs)
         manifest.append(
             dict(
-                file=path.name,
-                bytes=path.stat().st_size,
+                **fingerprint(path),
                 sha256=file_sha256(path),
                 records=stats['records'],
                 lines=stats['lines'],
