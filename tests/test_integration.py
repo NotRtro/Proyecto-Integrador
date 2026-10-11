@@ -103,6 +103,18 @@ def test_ocds_to_partitioned_parquet(tmp_path, monkeypatch):
         monkeypatch.setenv('RUN_REFRESH', '1')
         build.stage_raw_records(spark).count()
         assert staging_files() != before
+        # Caché de la etapa completa: con tablas y reporte presentes, no se vuelve a procesar.
+        monkeypatch.delenv('RUN_REFRESH')
+        artifacts = tmp_path / 'artifacts'
+        (artifacts / 'metadata').mkdir(parents=True)
+        (artifacts / 'metadata' / 'quality_summary.json').write_text(json.dumps(report, default=str))
+        monkeypatch.setattr(build, 'ARTIFACTS', artifacts)
+
+        def fail(*args):
+            raise AssertionError('no debía volver a procesar')
+
+        monkeypatch.setattr(build, 'deduplicate', fail)
+        assert build.run(spark)['selected_processes'] == 3
     finally:
         spark.stop()
 

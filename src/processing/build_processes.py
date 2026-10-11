@@ -31,7 +31,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import ArrayType, BooleanType, DoubleType, LongType, StringType, StructField, StructType
 
 from src.common import StepTimer, save_csv, save_json
-from src.config import PROCESSED, YEARS, refresh_requested, spark_session
+from src.config import ARTIFACTS, PROCESSED, YEARS, refresh_requested, spark_session
 from src.ingestion.json_records import decode_line
 from src.ingestion.validate_files import input_files
 from src.processing.model import flatten
@@ -547,8 +547,42 @@ def write_partitioned(df, name):
     )
 
 
+OUTPUT_TABLES = ['processes', *CHILDREN, 'process_features']
+
+
+def processing_fingerprint(files):
+    """Huella de todo lo que determina las tablas: archivos, código, años y umbral de stopwords."""
+    digest = hashlib.sha256(staging_fingerprint(files).encode())
+    with open(sys.modules['src.processing.text_features'].__file__, 'rb') as source:
+        digest.update(source.read())
+    digest.update(f'{YEARS}:{DOMAIN_STOPWORD_DF}'.encode())
+    return digest.hexdigest()
+
+
+def cached_run(files):
+    """Reporte de calidad anterior si las tablas ya existen y nada de lo que las determina cambió.
+
+    Deduplicar, convertir monedas y escribir seis tablas toma varios minutos y, con los mismos
+    archivos, código y parámetros, produce exactamente lo mismo: se reutiliza.
+    """
+    marker = PROCESSED / 'processing_fingerprint.json'
+    quality = ARTIFACTS / 'metadata/quality_summary.json'
+    if refresh_requested() or not marker.is_file() or not quality.is_file():
+        return None
+    if not all((PROCESSED / t).is_dir() for t in OUTPUT_TABLES):
+        return None
+    if json.loads(marker.read_text(encoding='utf-8')).get('fingerprint') != processing_fingerprint(files):
+        return None
+    return json.loads(quality.read_text(encoding='utf-8'))
+
+
 def run(spark=None):
     s = spark or spark_session()
+    files = input_files()
+    cached = cached_run(files)
+    if cached is not None:
+        print('Procesamiento sin cambios (archivos, código y parámetros): se reutilizan las tablas', flush=True)
+        return cached
     timer = StepTimer()
     with timer.step('lectura, parseo y staging'):
         staged = stage_raw_records(s)
@@ -600,6 +634,9 @@ def run(spark=None):
         {**{k: schema(k).jsonValue() for k in FIELDS}, 'process_features': features.schema.jsonValue()},
     )
     save_json('metadata/processing_timings.json', timer.steps)
+    (PROCESSED / 'processing_fingerprint.json').write_text(
+        json.dumps(dict(fingerprint=processing_fingerprint(files))), encoding='utf-8'
+    )
     for df in (unique, selected_rows, selected):
         df.unpersist()
     return quality
