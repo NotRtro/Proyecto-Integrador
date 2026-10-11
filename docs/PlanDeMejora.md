@@ -160,10 +160,27 @@ Fase 0 Cimientos ─► Fase 1 Capa de datos ─► Fases 2–6 Partes I–V ─
 | [x] 9.1 | C-02 | Pasada final de `ruff format` y `ruff check` sobre `src/`, `api/` y `tests/`. | Sin errores **Resultado:** `ruff.toml` (120 columnas, comillas preservadas, reglas E/F/W/I): `ruff format` reformateó 52 archivos y `ruff check` pasa sin errores en `src/`, `api/`, `tests/` y `scripts/`. 57 tests en verde. |
 | [x] 9.2 | C-04 | Archivar `PLAN_EJECUCION_OECE_JSON_DOCKER.md` en `docs/historico/`. README actualizado (descarga, modo muestra, modo estático, publicación). | — **Resultado:** plan original en `docs/historico/`; README reescrito (preguntas, ejecución, modo muestra, publicación estática, motor de cada módulo, criterios de datos, verificación y lo que redacta el equipo); `PRESENTACION.md` actualizado a Q1–Q3; target `make static`. |
 | [x] 9.3 | C-07 | `CODE_VERSION` como build-arg para el manifiesto. | El manifiesto muestra el commit real **Resultado:** `ARG CODE_VERSION` en `Dockerfile.pipeline`, argumento de build en Compose y `make build` pasa `git rev-parse --short HEAD`; verificado dentro del contenedor. |
-| [ ] 9.4 | — | Corrida completa final: `make test` y `artifact_validation` en verde. | `status == complete` |
+| [x] 9.4 | — | Corrida completa final: `make test` y `artifact_validation` en verde. | `status == complete` **Resultado:** corrida completa con el commit `1450c5b` registrado en el manifiesto: `complete`, 26,7 min, 18/18 controles, 9 reglas. 57 tests de pytest, `test_api` (15 endpoints), `test_frontend` y 13 tests de vitest en verde; exportación estática regenerada (597 respuestas, 12,1 MB). |
 | [ ] 9.5 | VI-01 | Publicar la web estática y dejar el enlace en el README. | URL accesible |
 
 ---
+
+## Estado al cierre de la implementación (11/10/2026)
+
+Todos los pasos de código están hechos salvo el **9.5**, que requiere publicar en GitHub (push de la rama, PR a `main` y activar Pages en el repositorio).
+
+**Lo que falta y depende del equipo** (es lo que más pesa en la nota, Parte VI = 4 puntos):
+
+| Tarea | Dónde | IDs |
+|---|---|---|
+| Redactar las 29 interpretaciones con contexto peruano | `frontend/src/content/hallazgos/*.md` (cada una trae preguntas guía) | I-05, V-01, VI-02, VI-06 |
+| Interpretar las 9 reglas seleccionadas | `frontend/src/content/rules.json` | V-01 |
+| Validar casos de similitud en SEACE | `artifacts/similarity/case_candidates.json` → `frontend/src/content/similarity_cases.json` | II-04 |
+| Grabar el video de demostración | guion en `PRESENTACION.md` | VI-01 |
+| Completar el documento de selección con las cifras reales | `docs/SeleccionBDPublicaPeru.md` | G-02 |
+| Repartir y ensayar la sustentación | — | C-09 |
+
+**Nota estimada.** Con el código actual, las partes técnicas (I a V y código) quedan cubiertas en todos sus requisitos explícitos. La nota final depende de la calidad de las interpretaciones: con textos propios y sólidos, ≈ 17–19 / 20; si quedan pendientes, la Parte VI y las interpretaciones de cada parte siguen penalizadas (≈ 14–15 / 20).
 
 ## 4. Cobertura de la evaluación
 
