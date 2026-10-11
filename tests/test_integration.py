@@ -20,6 +20,7 @@ def test_ocds_to_partitioned_parquet(tmp_path,monkeypatch):
         assert report['selected_processes']==3 and report['duplicate_ocids']==1
         df=spark.read.parquet(str(tmp_path/'processed'/'processes'))
         row=df.filter("ocid = 'a'").first(); assert row.tender_amount_pen==200
+        assert row.buyer_level=='otro' and report['buyer_levels']['classified_share']==0.0
         usd=df.filter("ocid = 'usd'").first(); assert usd.award_amount_pen==190 and usd.award_converted_count==1
         usd_zero=df.filter("ocid = 'usd-zero'").first(); assert usd_zero.award_amount_pen==38 and usd_zero.award_unconverted_count==0
         # La conversión histórica debe registrar método y tasa, no solo el monto.
@@ -27,4 +28,28 @@ def test_ocds_to_partitioned_parquet(tmp_path,monkeypatch):
         assert award.conversion_method=='oece_daily_median_rate' and award.exchange_rate==3.8 and award.amount_pen==38
         suppliers=spark.read.parquet(str(tmp_path/'processed'/'suppliers')).collect()
         assert len(suppliers)==4 and sum(r.allocated_amount_pen for r in suppliers)==428
+    finally: spark.stop()
+
+
+@pytest.mark.integration
+def test_normalize_suppliers_canonical_name_and_type():
+    from src.config import spark_session
+    from src.processing import build_processes as build
+    spark=spark_session()
+    try:
+        rows=[('a','2024-01-01','PE-RUC-10123456789','ARRIETA NINO LUIS'),
+              ('b','2025-01-01','PE-RUC-10123456789','ARRIETA NIÑO LUIS'),
+              ('c','2024-01-01','PE-RUC-20123456789','EMPRESA X S.A.C.'),
+              ('d','2024-01-01','PE-RUC-555574','CONSORCIO CARMADI - DMV E.I.R.L.'),
+              ('e','2024-01-01','PE-RUC-1704037','ROLOPOM CORPORIS II'),
+              ('f','2024-01-01','PE-RUC-L0609016640','CANADIAN COMMERCIAL CORPORATION-CCC')]
+        base={k:None for k in build.FIELDS['suppliers']}
+        data=[dict(base,ocid=o,release_date=r,supplier_id=i,supplier_name=n,award_id='1') for o,r,i,n in rows]
+        df=spark.createDataFrame(data,build.StructType([f for f in build.schema('suppliers').fields if f.name in base]))
+        out={(r.ocid):r for r in build.normalize_suppliers(df).collect()}
+        # El nombre canónico es el de la publicación más reciente; el original se conserva.
+        assert out['a'].supplier_name=='ARRIETA NIÑO LUIS' and out['a'].supplier_name_original=='ARRIETA NINO LUIS'
+        assert out['a'].supplier_type=='persona_natural' and out['c'].supplier_type=='persona_juridica'
+        assert out['d'].supplier_type=='consorcio' and out['e'].supplier_type=='consorcio'
+        assert out['f'].supplier_type=='extranjero'
     finally: spark.stop()
