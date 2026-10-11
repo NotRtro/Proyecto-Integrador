@@ -20,7 +20,7 @@ Count-Min Sketch (Parte IV) estima frecuencias de proveedores y de códigos UNSP
 Requisitos: Docker Desktop con unos 8 GB de RAM y Docker Compose v2. No hace falta Python ni Java en el anfitrión.
 
 ```bash
-make all      # build + clúster + descarga + pipeline completo (unos 15-30 min)
+make all      # build + clúster + descarga + pipeline completo (~27 min la primera vez)
 ```
 
 Sin `make` (por ejemplo, Git Bash en Windows):
@@ -36,9 +36,21 @@ Después, abrir **http://localhost:8501** (web), **http://localhost:8000/docs** 
 
 `data/raw`, `data/processed` y `artifacts` persisten en el anfitrión. La descarga es reanudable y no se repite si el archivo coincide en tamaño y fecha de publicación. `data/raw/download_manifest.json` registra la URL, `Last-Modified`, el tamaño y el SHA-256 de cada archivo. El portal se actualiza cada mes, así que ese manifiesto identifica la versión exacta de los datos.
 
+### Perfiles, mediciones y cachés
+
+Lo que responde Q1, Q2 y Q3 usa siempre **todos** los datos; los perfiles solo cambian la evaluación de ANN y si se repiten las mediciones de una vez. Las decisiones y su evidencia están en [docs/DecisionesTecnicas.md](docs/DecisionesTecnicas.md).
+
+| Modo | Comando | Tiempo medido |
+|---|---|---|
+| Completo (informe y web publicada) | `make run` | ~25–27 min |
+| Rápido con caché (trabajo diario, todos los datos) | `make rapido` | ~8 min |
+| Muestra de desarrollo (probar código) | `make dev` | ~9 min |
+
+Opciones de `src.run_all`: `--profile completo|rapido`, `--experiments si|no|auto` (mediciones de una vez: benchmark RDD/DataFrame, particionamiento, Spark vs. pandas, escalamiento ANN, efecto de muestrear la Q1) y `--refresh` (ignorar las cachés de validación, staging y procesamiento). `artifacts/metadata/experiments.json` dice cuándo y con qué código se midió cada experimento.
+
 ### Modo muestra (desarrollo)
 
-Una muestra reproducible del 3 % de las líneas permite probar el pipeline completo en unos 6 minutos. Sus cifras **no** valen para el informe.
+Una muestra reproducible del 3 % de las líneas permite probar el pipeline completo de punta a punta. Sus cifras **no** valen para el informe; para trabajar con resultados reales conviene `make rapido`, que con caché tarda lo mismo.
 
 ```bash
 make dev-sample && make dev
@@ -119,4 +131,4 @@ La web muestra un aviso "Pendiente de redacción" hasta que se completen:
 - `frontend/src/content/rules.json`: la interpretación de las reglas seleccionadas (clave `rule_id`).
 - `frontend/src/content/similarity_cases.json`: los casos de similitud validados en SEACE, a partir de `artifacts/similarity/case_candidates.json`.
 
-La evaluación del proyecto y el plan de mejora están en `docs/`. El plan de ejecución original quedó en `docs/historico/`.
+La evaluación del proyecto, el plan de mejora y las decisiones técnicas de volumen están en `docs/`. El plan de ejecución original quedó en `docs/historico/`.
