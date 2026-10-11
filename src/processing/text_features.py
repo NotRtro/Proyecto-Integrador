@@ -16,6 +16,7 @@ Decisiones:
   "potable agua") sin volverse tan específicos que dos redacciones casi iguales no
   compartan nada. Si el texto tiene una sola palabra útil, se usa esa palabra.
 """
+
 import os
 
 from pyspark.sql import functions as F
@@ -27,20 +28,24 @@ SHINGLE_WIDTH = 2
 def domain_stopwords(processes, threshold=DOMAIN_STOPWORD_DF):
     """Términos cuya frecuencia documental supera `threshold`, con su frecuencia."""
     total = processes.count()
-    terms = (processes
-             .select(F.explode(F.array_distinct(F.split('normalized_text', ' '))).alias('term'))
-             .filter(F.col('term') != '')
-             .groupBy('term').count()
-             .filter(F.col('count') > threshold * total)
-             .orderBy(F.desc('count'))
-             .collect())
+    terms = (
+        processes.select(F.explode(F.array_distinct(F.split('normalized_text', ' '))).alias('term'))
+        .filter(F.col('term') != '')
+        .groupBy('term')
+        .count()
+        .filter(F.col('count') > threshold * total)
+        .orderBy(F.desc('count'))
+        .collect()
+    )
     return [dict(term=r['term'], document_frequency=r['count'] / total) for r in terms]
 
 
 def shingles_column(stopwords, width=SHINGLE_WIDTH):
     """Expresión Spark: shingles ordenados y sin repetir de `normalized_text`."""
     tokens = F.filter(F.split('normalized_text', ' '), lambda t: (t != '') & ~t.isin(list(stopwords)))
-    grams = F.transform(F.sequence(F.lit(1), F.size(tokens) - width + 1),
-                        lambda i: F.concat_ws(' ', F.slice(tokens, i, width)))
-    return (F.when(F.size(tokens) >= width, F.array_sort(F.array_distinct(grams)))
-            .otherwise(F.array_sort(F.array_distinct(tokens))))
+    grams = F.transform(
+        F.sequence(F.lit(1), F.size(tokens) - width + 1), lambda i: F.concat_ws(' ', F.slice(tokens, i, width))
+    )
+    return F.when(F.size(tokens) >= width, F.array_sort(F.array_distinct(grams))).otherwise(
+        F.array_sort(F.array_distinct(tokens))
+    )

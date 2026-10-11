@@ -4,6 +4,7 @@ Valida invariantes (rangos, no vacío, coherencia entre endpoints) en lugar de
 cantidades exactas, para que el test siga siendo válido si cambian los datos del
 portal, la muestra o las rejillas de parámetros.
 """
+
 import json
 import urllib.parse
 import urllib.request
@@ -66,7 +67,7 @@ assert all(row["underestimates"] == 0 for row in streaming["cms"]), "CMS no pued
 association = get("/api/association")
 selected = association["selected"]
 assert selected["found"] >= 8 or selected["status"] == "insufficient_evidence"
-assert all(r["support"] >= .02 and r["confidence"] >= .5 for r in association["rules"])
+assert all(r["support"] >= 0.02 and r["confidence"] >= 0.5 for r in association["rules"])
 
 discussion = get("/api/discussion")
 assert discussion["run"]["status"] == "complete"

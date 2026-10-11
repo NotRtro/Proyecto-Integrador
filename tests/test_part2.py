@@ -5,8 +5,15 @@ import pytest
 
 from src.part2.evaluation import exact_jaccard, minhash_error
 from src.part2.exact_jaccard import jaccard
-from src.part2.minhash_lsh import (MERSENNE, band_keys, candidate_probability, coefficients, effective_threshold,
-                                   estimate, signature)
+from src.part2.minhash_lsh import (
+    MERSENNE,
+    band_keys,
+    candidate_probability,
+    coefficients,
+    effective_threshold,
+    estimate,
+    signature,
+)
 
 
 def test_signature_is_order_invariant_and_seeded():
@@ -25,8 +32,8 @@ def test_minhash_estimate_error_matches_theory():
         b = common + [f'b{trial}_{i}' for i in range(20)]
         coeffs = coefficients(256, rng.randrange(10**6))
         errors.append(estimate(signature(a, coeffs=coeffs), signature(b, coeffs=coeffs)) - jaccard(a, b))
-    assert abs(np.mean(errors)) < 0.02                     # insesgado
-    assert np.sqrt(np.mean(np.square(errors))) < 0.06      # cerca de sqrt(0.6*0.4/256) = 0.031
+    assert abs(np.mean(errors)) < 0.02  # insesgado
+    assert np.sqrt(np.mean(np.square(errors))) < 0.06  # cerca de sqrt(0.6*0.4/256) = 0.031
 
 
 def test_sparse_exact_jaccard_matches_definition():
@@ -63,6 +70,7 @@ def test_band_keys_and_s_curve():
 def test_full_corpus_lsh_finds_near_duplicates():
     from src.config import spark_session
     from src.part2 import full_corpus
+
     spark = spark_session()
     try:
         base = [f'w{i} w{i + 1}' for i in range(30)]
@@ -84,22 +92,33 @@ def test_full_corpus_lsh_finds_near_duplicates():
 def test_repeated_requirements_classification():
     from src.config import spark_session
     from src.part2 import repeated
+
     spark = spark_session()
     try:
-        cols = 'ocid string, buyer_id string, buyer_name string, buyer_level string, department string, category string, ' \
-               'method string, effective_date string, year int, tender_code string, tender_amount_pen double'
-        processes = spark.createDataFrame([
-            ('p1', 'b1', 'B1', 'local', 'LIMA', 'goods', 'AS', '2024-01-01', 2024, 'AS-SM-1-2024-X-1', 10.0),
-            ('p2', 'b1', 'B1', 'local', 'LIMA', 'goods', 'AS', '2024-01-10', 2024, 'AS-SM-1-2024-X-2', 10.0),
-            ('p3', 'b1', 'B1', 'local', 'LIMA', 'goods', 'AS', '2024-06-01', 2024, 'AS-SM-9-2024-X-1', 10.0),
-            ('p4', 'b2', 'B2', 'local', 'PIURA', 'goods', 'AS', '2024-01-05', 2024, 'AS-SM-3-2024-Y-1', 10.0)], cols)
-        similar = spark.createDataFrame([('p1', 'p2', 0.9), ('p1', 'p3', 0.8), ('p1', 'p4', 0.75), ('p2', 'p3', 0.8)],
-                                        'left string, right string, jaccard double')
+        cols = (
+            'ocid string, buyer_id string, buyer_name string, buyer_level string, department string, category string, '
+            'method string, effective_date string, year int, tender_code string, tender_amount_pen double'
+        )
+        processes = spark.createDataFrame(
+            [
+                ('p1', 'b1', 'B1', 'local', 'LIMA', 'goods', 'AS', '2024-01-01', 2024, 'AS-SM-1-2024-X-1', 10.0),
+                ('p2', 'b1', 'B1', 'local', 'LIMA', 'goods', 'AS', '2024-01-10', 2024, 'AS-SM-1-2024-X-2', 10.0),
+                ('p3', 'b1', 'B1', 'local', 'LIMA', 'goods', 'AS', '2024-06-01', 2024, 'AS-SM-9-2024-X-1', 10.0),
+                ('p4', 'b2', 'B2', 'local', 'PIURA', 'goods', 'AS', '2024-01-05', 2024, 'AS-SM-3-2024-Y-1', 10.0),
+            ],
+            cols,
+        )
+        similar = spark.createDataFrame(
+            [('p1', 'p2', 0.9), ('p1', 'p3', 0.8), ('p1', 'p4', 0.75), ('p2', 'p3', 0.8)],
+            'left string, right string, jaccard double',
+        )
         pairs = {(r.left, r.right): r for r in repeated.classify(similar, processes).collect()}
         assert pairs[('p1', 'p2')].kind == repeated.CATEGORIES[0] and pairs[('p1', 'p2')].reconvocation
         assert pairs[('p1', 'p3')].kind == repeated.CATEGORIES[1] and not pairs[('p1', 'p3')].reconvocation
         assert pairs[('p1', 'p4')].kind == repeated.CATEGORIES[2]
-        involved = {r.kind: r.processes_involved for r in repeated.summary(repeated.classify(similar, processes)).collect()}
+        involved = {
+            r.kind: r.processes_involved for r in repeated.summary(repeated.classify(similar, processes)).collect()
+        }
         assert involved[repeated.CATEGORIES[1]] == 3  # pares (p1,p3) y (p2,p3): tres procesos distintos
     finally:
         spark.stop()

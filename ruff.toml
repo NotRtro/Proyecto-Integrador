@@ -1,0 +1,14 @@
+# Formato y lint del código Python (paso 9.1). Se conservan las comillas existentes.
+line-length = 120
+target-version = "py311"
+extend-exclude = ["frontend", "data", "artifacts", ".venv"]
+
+[format]
+quote-style = "preserve"
+
+[lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E731"]
+
+[lint.isort]
+known-first-party = ["src", "api"]

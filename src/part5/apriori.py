@@ -8,12 +8,13 @@ k y cuyos subconjuntos de tamaño k-1 son todos frecuentes (propiedad Apriori: s
 conjunto es infrecuente, ningún superconjunto puede ser frecuente). Luego se cuenta el
 soporte de cada candidato recorriendo las canastas.
 """
+
 import itertools
 import math
 from collections import Counter
 
 
-def apriori(transactions, min_support=.02):
+def apriori(transactions, min_support=0.02):
     """Diccionario {conjunto frecuente: frecuencia absoluta}."""
     baskets = [set(t) for t in transactions]
     n = len(baskets)
@@ -27,9 +28,12 @@ def apriori(transactions, min_support=.02):
     while level:
         previous = set(level)
         keys = list(previous)
-        candidates = {a | b for i, a in enumerate(keys) for b in keys[i + 1:]
-                      if len(a | b) == size
-                      and all(frozenset(s) in previous for s in itertools.combinations(a | b, size - 1))}
+        candidates = {
+            a | b
+            for i, a in enumerate(keys)
+            for b in keys[i + 1 :]
+            if len(a | b) == size and all(frozenset(s) in previous for s in itertools.combinations(a | b, size - 1))
+        }
         level = {c: sum(c <= basket for basket in baskets) for c in candidates}
         level = {c: count for c, count in level.items() if count >= minimum}
         frequent.update(level)

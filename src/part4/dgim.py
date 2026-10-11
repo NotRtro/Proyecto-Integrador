@@ -38,7 +38,7 @@ class DGIM:
                 break
             newer, older = same[-2:]
             # El bucket fusionado conserva la marca del más reciente de los dos.
-            self.buckets[newer:older + 1] = [(size * 2, self.buckets[newer][1])]
+            self.buckets[newer : older + 1] = [(size * 2, self.buckets[newer][1])]
             size *= 2
 
     def query(self):

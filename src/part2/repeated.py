@@ -16,6 +16,7 @@ nomenclatura salvo ese número, se marcan como reconvocatoria.
 
 Ninguna categoría implica irregularidad: son señales para priorizar revisión.
 """
+
 from pyspark.sql import functions as F
 
 SHORT_WINDOW_DAYS = 30
@@ -24,19 +25,41 @@ CATEGORIES = ['misma entidad, <= 30 días', 'misma entidad, > 30 días', 'entida
 
 def classify(similar, processes):
     """Pares verificados con contexto de ambos procesos y su categoría."""
-    context = processes.select('ocid', 'buyer_id', 'buyer_name', 'buyer_level', 'department', 'category', 'method',
-                               'effective_date', 'year', 'tender_code', 'tender_amount_pen')
-    left = context.select(*[F.col(c).alias(f'left_{c}') if c != 'ocid' else F.col(c).alias('left') for c in context.columns])
-    right = context.select(*[F.col(c).alias(f'right_{c}') if c != 'ocid' else F.col(c).alias('right') for c in context.columns])
+    context = processes.select(
+        'ocid',
+        'buyer_id',
+        'buyer_name',
+        'buyer_level',
+        'department',
+        'category',
+        'method',
+        'effective_date',
+        'year',
+        'tender_code',
+        'tender_amount_pen',
+    )
+    left = context.select(
+        *[F.col(c).alias(f'left_{c}') if c != 'ocid' else F.col(c).alias('left') for c in context.columns]
+    )
+    right = context.select(
+        *[F.col(c).alias(f'right_{c}') if c != 'ocid' else F.col(c).alias('right') for c in context.columns]
+    )
     days = F.abs(F.datediff(F.to_date('left_effective_date'), F.to_date('right_effective_date')))
     base_code = lambda c: F.regexp_replace(F.col(c), r'-\d+$', '')  # noqa: E731 (nomenclatura sin el número final)
     same_buyer = F.col('left_buyer_id') == F.col('right_buyer_id')
-    return (similar.join(left, 'left').join(right, 'right')
-            .withColumn('days_apart', days)
-            .withColumn('same_buyer', same_buyer)
-            .withColumn('reconvocation', same_buyer & (base_code('left_tender_code') == base_code('right_tender_code')))
-            .withColumn('kind', F.when(same_buyer & (F.col('days_apart') <= SHORT_WINDOW_DAYS), CATEGORIES[0])
-                        .when(same_buyer, CATEGORIES[1]).otherwise(CATEGORIES[2])))
+    return (
+        similar.join(left, 'left')
+        .join(right, 'right')
+        .withColumn('days_apart', days)
+        .withColumn('same_buyer', same_buyer)
+        .withColumn('reconvocation', same_buyer & (base_code('left_tender_code') == base_code('right_tender_code')))
+        .withColumn(
+            'kind',
+            F.when(same_buyer & (F.col('days_apart') <= SHORT_WINDOW_DAYS), CATEGORIES[0])
+            .when(same_buyer, CATEGORIES[1])
+            .otherwise(CATEGORIES[2]),
+        )
+    )
 
 
 def involved_processes(pairs, keys):
@@ -56,7 +79,8 @@ def summary(pairs):
         F.count('*').alias('pairs'),
         F.sum(F.col('reconvocation').cast('int')).alias('reconvocation_pairs'),
         F.countDistinct('left_buyer_id').alias('buyers'),
-        F.avg('jaccard').alias('mean_jaccard'))
+        F.avg('jaccard').alias('mean_jaccard'),
+    )
     return totals.join(involved_processes(with_year, ['kind', 'year']), ['kind', 'year']).orderBy('kind', 'year')
 
 
@@ -64,10 +88,12 @@ def top_buyers(pairs, n=30):
     """Entidades con más procesos repetidos en <= 30 días, sin contar reconvocatorias."""
     short = pairs.filter((F.col('kind') == CATEGORIES[0]) & ~F.col('reconvocation'))
     keys = ['left_buyer_id', 'left_buyer_name', 'left_buyer_level', 'left_department']
-    stats = short.groupBy(*keys).agg(F.count('*').alias('pairs'), F.avg('jaccard').alias('mean_jaccard'),
-                                     F.avg('days_apart').alias('mean_days_apart'))
-    return (stats.join(involved_processes(short, keys), keys)
-            .orderBy(F.desc('processes_involved')).limit(n))
+    stats = short.groupBy(*keys).agg(
+        F.count('*').alias('pairs'),
+        F.avg('jaccard').alias('mean_jaccard'),
+        F.avg('days_apart').alias('mean_days_apart'),
+    )
+    return stats.join(involved_processes(short, keys), keys).orderBy(F.desc('processes_involved')).limit(n)
 
 
 def case_candidates(pairs, features, per_kind=5):
@@ -77,12 +103,17 @@ def case_candidates(pairs, features, per_kind=5):
     textos y la nomenclatura para buscarlos en el buscador público del SEACE.
     """
     texts = features.select('ocid', 'text')
-    ranked = pairs.withColumn('amount', F.coalesce('left_tender_amount_pen', F.lit(0)) + F.coalesce('right_tender_amount_pen', F.lit(0)))
+    ranked = pairs.withColumn(
+        'amount', F.coalesce('left_tender_amount_pen', F.lit(0)) + F.coalesce('right_tender_amount_pen', F.lit(0))
+    )
     rows = []
     for kind in CATEGORIES:
-        chosen = (ranked.filter((F.col('kind') == kind) & ~F.col('reconvocation'))
-                  .orderBy(F.desc('amount')).limit(per_kind)
-                  .join(texts.withColumnRenamed('ocid', 'left').withColumnRenamed('text', 'left_text'), 'left')
-                  .join(texts.withColumnRenamed('ocid', 'right').withColumnRenamed('text', 'right_text'), 'right'))
+        chosen = (
+            ranked.filter((F.col('kind') == kind) & ~F.col('reconvocation'))
+            .orderBy(F.desc('amount'))
+            .limit(per_kind)
+            .join(texts.withColumnRenamed('ocid', 'left').withColumnRenamed('text', 'left_text'), 'left')
+            .join(texts.withColumnRenamed('ocid', 'right').withColumnRenamed('text', 'right_text'), 'right')
+        )
         rows.extend(r.asDict() for r in chosen.collect())
     return rows

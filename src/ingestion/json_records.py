@@ -8,6 +8,7 @@ pegados (`{...}{...}`). En vez de descartar la línea, se decodifican todos los 
 completos; cualquier resto que no sea un objeto válido hace fallar la línea, para no
 aceptar datos truncados en silencio.
 """
+
 import json
 
 

@@ -16,14 +16,15 @@ Experimentos:
 Artefactos (artifacts/ann/): scaling.csv, hnsw_grid.csv, ivf_grid.csv, neighbors_display.csv,
 documents.csv, queries.json, methodology.json.
 """
+
 import numpy as np
 import pandas as pd
 from pyspark.sql import functions as F
 
-from src.common import StepTimer, features as read_features, save_csv, save_json
+from src.common import StepTimer, save_csv, save_json
+from src.common import features as read_features
 from src.config import ARTIFACTS, SEED, spark_session
-from src.part3.indexes import (ann_search, bootstrap_ci, build_hnsw, build_ivf, exact_search, index_bytes,
-                               recall_at)
+from src.part3.indexes import ann_search, bootstrap_ci, build_hnsw, build_ivf, exact_search, index_bytes, recall_at
 from src.part3.vectors import build_vectors
 
 K = 10
@@ -42,8 +43,12 @@ PART2_PAIRS = 300
 
 
 def latency_stats(latencies, exact_mean):
-    return dict(mean_ms=1000 * latencies.mean(), median_ms=1000 * np.median(latencies),
-                p95_ms=1000 * np.percentile(latencies, 95), speedup=exact_mean / latencies.mean())
+    return dict(
+        mean_ms=1000 * latencies.mean(),
+        median_ms=1000 * np.median(latencies),
+        p95_ms=1000 * np.percentile(latencies, 95),
+        speedup=exact_mean / latencies.mean(),
+    )
 
 
 def recall_stats(found, exact, seed):
@@ -51,8 +56,9 @@ def recall_stats(found, exact, seed):
     for k in (5, 10):
         values = recall_at(found, exact, k)
         low, high = bootstrap_ci(values, seed)
-        stats.update({f'recall_at_{k}': float(values.mean()), f'recall_at_{k}_ci_low': low,
-                      f'recall_at_{k}_ci_high': high})
+        stats.update(
+            {f'recall_at_{k}': float(values.mean()), f'recall_at_{k}_ci_low': low, f'recall_at_{k}_ci_high': high}
+        )
     return stats
 
 
@@ -73,14 +79,25 @@ def scaling(vectors, queries):
         ivf, ivf_build = build_ivf(subset, nlist, SEED)
         ivf.nprobe = SCALING_NPROBE
         ivf_found, ivf_lat = ann_search(ivf, subset, queries, K)
-        rows.append(dict(corpus_size=size, exact_mean_ms=1000 * exact_lat.mean(),
-                         hnsw_mean_ms=1000 * hnsw_lat.mean(), hnsw_build_seconds=hnsw_build,
-                         hnsw_recall_at_10=float(recall_at(hnsw_found, exact, K).mean()),
-                         ivf_nlist=nlist, ivf_mean_ms=1000 * ivf_lat.mean(), ivf_build_seconds=ivf_build,
-                         ivf_recall_at_10=float(recall_at(ivf_found, exact, K).mean()),
-                         exact_matrix_mb=subset.nbytes / 1e6))
-        print(f'ANN escalamiento N={size}: exacto {rows[-1]["exact_mean_ms"]:.2f} ms, '
-              f'HNSW {rows[-1]["hnsw_mean_ms"]:.3f} ms', flush=True)
+        rows.append(
+            dict(
+                corpus_size=size,
+                exact_mean_ms=1000 * exact_lat.mean(),
+                hnsw_mean_ms=1000 * hnsw_lat.mean(),
+                hnsw_build_seconds=hnsw_build,
+                hnsw_recall_at_10=float(recall_at(hnsw_found, exact, K).mean()),
+                ivf_nlist=nlist,
+                ivf_mean_ms=1000 * ivf_lat.mean(),
+                ivf_build_seconds=ivf_build,
+                ivf_recall_at_10=float(recall_at(ivf_found, exact, K).mean()),
+                exact_matrix_mb=subset.nbytes / 1e6,
+            )
+        )
+        print(
+            f'ANN escalamiento N={size}: exacto {rows[-1]["exact_mean_ms"]:.2f} ms, '
+            f'HNSW {rows[-1]["hnsw_mean_ms"]:.3f} ms',
+            flush=True,
+        )
     return pd.DataFrame(rows)
 
 
@@ -95,10 +112,22 @@ def hnsw_grid(vectors, queries, exact, exact_mean):
                 found, latencies = ann_search(index, vectors, queries, K)
                 config = f'M{m}_efC{ef_construction}_efS{ef_search}'
                 found_by_config[config] = found
-                rows.append(dict(config=config, M=m, efConstruction=ef_construction, efSearch=ef_search,
-                                 **recall_stats(found, exact, SEED), **latency_stats(latencies, exact_mean),
-                                 exact_mean_ms=1000 * exact_mean, build_seconds=build, index_bytes=size,
-                                 corpus_size=len(vectors), queries=len(queries), kmax=K))
+                rows.append(
+                    dict(
+                        config=config,
+                        M=m,
+                        efConstruction=ef_construction,
+                        efSearch=ef_search,
+                        **recall_stats(found, exact, SEED),
+                        **latency_stats(latencies, exact_mean),
+                        exact_mean_ms=1000 * exact_mean,
+                        build_seconds=build,
+                        index_bytes=size,
+                        corpus_size=len(vectors),
+                        queries=len(queries),
+                        kmax=K,
+                    )
+                )
             print(f'HNSW M={m} efC={ef_construction}: construcción {build:.1f}s', flush=True)
     return pd.DataFrame(rows), found_by_config
 
@@ -113,17 +142,31 @@ def ivf_grid(vectors, queries, exact, exact_mean):
             found, latencies = ann_search(index, vectors, queries, K)
             config = f'IVF{nlist}_nprobe{nprobe}'
             found_by_config[config] = found
-            rows.append(dict(config=config, nlist=nlist, nprobe=nprobe, cells_scanned=nprobe / nlist,
-                             **recall_stats(found, exact, SEED), **latency_stats(latencies, exact_mean),
-                             exact_mean_ms=1000 * exact_mean, build_seconds=build, index_bytes=size,
-                             corpus_size=len(vectors), queries=len(queries), kmax=K))
+            rows.append(
+                dict(
+                    config=config,
+                    nlist=nlist,
+                    nprobe=nprobe,
+                    cells_scanned=nprobe / nlist,
+                    **recall_stats(found, exact, SEED),
+                    **latency_stats(latencies, exact_mean),
+                    exact_mean_ms=1000 * exact_mean,
+                    build_seconds=build,
+                    index_bytes=size,
+                    corpus_size=len(vectors),
+                    queries=len(queries),
+                    kmax=K,
+                )
+            )
     return pd.DataFrame(rows), found_by_config
 
 
 def best(grid):
     """La configuración más rápida que alcanza el recall objetivo (o la de mayor recall)."""
     eligible = grid[grid.recall_at_10 >= TARGET_RECALL]
-    return (eligible.sort_values('mean_ms') if not eligible.empty else grid.sort_values('recall_at_10', ascending=False)).iloc[0]
+    return (
+        eligible.sort_values('mean_ms') if not eligible.empty else grid.sort_values('recall_at_10', ascending=False)
+    ).iloc[0]
 
 
 def part2_agreement(vectors, position):
@@ -145,9 +188,13 @@ def part2_agreement(vectors, position):
     pair_similarity = np.einsum('ij,ij->i', vectors[left], vectors[right])
     tenth = np.einsum('ij,ij->i', vectors[left], vectors[neighbors[:, -1]])
     literal = np.array([r in n for r, n in zip(right, neighbors)])
-    return dict(pairs=len(pairs), in_top10=float(np.mean(pair_similarity >= tenth - 1e-6)),
-                in_top10_literal=float(literal.mean()), mean_jaccard=float(pairs.jaccard.mean()),
-                mean_cosine=float(pair_similarity.mean()))
+    return dict(
+        pairs=len(pairs),
+        in_top10=float(np.mean(pair_similarity >= tenth - 1e-6)),
+        in_top10_literal=float(literal.mean()),
+        mean_jaccard=float(pairs.jaccard.mean()),
+        mean_cosine=float(pair_similarity.mean()),
+    )
 
 
 def display(data, vectors, queries, exact, configs):
@@ -156,8 +203,15 @@ def display(data, vectors, queries, exact, configs):
         for q, neighbors in zip(queries, found):
             for rank, j in enumerate(neighbors[:K], 1):
                 if j >= 0:
-                    rows.append(dict(config=config, query_ocid=data.ocid[q], neighbor_ocid=data.ocid[j], rank=rank,
-                                     similarity=float(vectors[q] @ vectors[j])))
+                    rows.append(
+                        dict(
+                            config=config,
+                            query_ocid=data.ocid[q],
+                            neighbor_ocid=data.ocid[j],
+                            rank=rank,
+                            similarity=float(vectors[q] @ vectors[j]),
+                        )
+                    )
     used = {r['query_ocid'] for r in rows} | {r['neighbor_ocid'] for r in rows}
     return pd.DataFrame(rows), data[data.ocid.isin(used)][['ocid', 'text', 'year', 'category']]
 
@@ -166,9 +220,13 @@ def run(spark):
     timer = StepTimer()
     with timer.step('lectura y vectorización TF-IDF + SVD'):
         # Orden pseudoaleatorio reproducible: los prefijos del arreglo son submuestras aleatorias.
-        data = (read_features(spark).filter(F.length('normalized_text') > 0)
-                .select('ocid', 'normalized_text', 'text', 'year', 'category')
-                .orderBy(F.sha2(F.concat(F.col('ocid'), F.lit(str(SEED))), 256)).toPandas())
+        data = (
+            read_features(spark)
+            .filter(F.length('normalized_text') > 0)
+            .select('ocid', 'normalized_text', 'text', 'year', 'category')
+            .orderBy(F.sha2(F.concat(F.col('ocid'), F.lit(str(SEED))), 256))
+            .toPandas()
+        )
         vectors, info = build_vectors(data.normalized_text)
         keep = np.linalg.norm(vectors, axis=1) > 0
         vectors, data = vectors[keep], data[keep].reset_index(drop=True)
@@ -189,21 +247,37 @@ def run(spark):
 
     best_hnsw, best_ivf = best(hnsw), best(ivf)
     shown = queries[:DISPLAY_QUERIES]
-    configs = {'exact': exact[:DISPLAY_QUERIES], best_hnsw.config: hnsw_found[best_hnsw.config][:DISPLAY_QUERIES],
-               best_ivf.config: ivf_found[best_ivf.config][:DISPLAY_QUERIES]}
+    configs = {
+        'exact': exact[:DISPLAY_QUERIES],
+        best_hnsw.config: hnsw_found[best_hnsw.config][:DISPLAY_QUERIES],
+        best_ivf.config: ivf_found[best_ivf.config][:DISPLAY_QUERIES],
+    }
     neighbors, documents = display(data, vectors, shown, exact, configs)
     save_csv('ann/neighbors_display.csv', neighbors)
     save_csv('ann/documents.csv', documents)
     save_json('ann/queries.json', [dict(ocid=data.ocid[q], text=data.text[q]) for q in shown])
     agreement = part2_agreement(vectors, {o: i for i, o in enumerate(data.ocid)})
-    save_json('ann/methodology.json', dict(
-        vectors=info, queries=len(queries), k=K, target_recall=TARGET_RECALL,
-        exact=dict(mean_ms=1000 * float(exact_latencies.mean()), matrix_mb=vectors.nbytes / 1e6),
-        best_hnsw=best_hnsw.to_dict(), best_ivf=best_ivf.to_dict(), part2_agreement=agreement,
-        latency='Una consulta a la vez, un hilo, sin la propia consulta entre los vecinos.',
-        recall='Recall@k = fracción de los k vecinos exactos recuperados; IC 95 % por bootstrap sobre las consultas.'))
+    save_json(
+        'ann/methodology.json',
+        dict(
+            vectors=info,
+            queries=len(queries),
+            k=K,
+            target_recall=TARGET_RECALL,
+            exact=dict(mean_ms=1000 * float(exact_latencies.mean()), matrix_mb=vectors.nbytes / 1e6),
+            best_hnsw=best_hnsw.to_dict(),
+            best_ivf=best_ivf.to_dict(),
+            part2_agreement=agreement,
+            latency='Una consulta a la vez, un hilo, sin la propia consulta entre los vecinos.',
+            recall='Recall@k = fracción de los k vecinos exactos recuperados; IC 95 % por bootstrap sobre las '
+            'consultas.',
+        ),
+    )
     # Compatibilidad con la API actual (paso 7.2 la reemplaza por ivf_grid.csv).
-    save_json('ann/ivf_status.json', dict(implemented=True, reason='IVF implementado con faiss IndexIVFFlat: ver ivf_grid.csv.'))
+    save_json(
+        'ann/ivf_status.json',
+        dict(implemented=True, reason='IVF implementado con faiss IndexIVFFlat: ver ivf_grid.csv.'),
+    )
     save_json('ann/part3_timings.json', timer.steps)
 
 

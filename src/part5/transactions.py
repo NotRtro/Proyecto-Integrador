@@ -15,9 +15,16 @@ El año queda fuera de la canasta: no es una característica del proceso sino el
 momento, y producía reglas cronológicas obvias. Las métricas por año se calculan
 aparte, recontando cada regla sobre las canastas de ese año.
 """
+
 MISSING = 'sin dato'
-ATTRIBUTES = [('CAT', 'category'), ('MODALIDAD', 'modality'), ('DEP', 'department'), ('MONTO', 'amount_band'),
-              ('POSTORES', 'competition'), ('NIVEL', 'buyer_level')]
+ATTRIBUTES = [
+    ('CAT', 'category'),
+    ('MODALIDAD', 'modality'),
+    ('DEP', 'department'),
+    ('MONTO', 'amount_band'),
+    ('POSTORES', 'competition'),
+    ('NIVEL', 'buyer_level'),
+]
 
 
 def transaction(row):
@@ -25,6 +32,7 @@ def transaction(row):
         raw = row[column]
         # raw != raw detecta NaN, que es como pandas representa un faltante.
         return MISSING if raw is None or raw != raw or raw in ('', 'NO INFORMADO') else raw
+
     return sorted(f'{prefix}={value(column)}' for prefix, column in ATTRIBUTES)
 
 

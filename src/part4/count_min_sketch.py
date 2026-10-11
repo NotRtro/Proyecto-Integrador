@@ -10,6 +10,7 @@ estimado - exacto <= ε·N, con ε = e/w y δ = e^(-d), donde N es el total de e
 Es útil cuando hay muchos elementos distintos (decenas de miles de proveedores): un
 diccionario exacto crece con la cardinalidad, el sketch ocupa w·d contadores fijos.
 """
+
 import hashlib
 import math
 from array import array
@@ -33,8 +34,11 @@ class CountMinSketch:
 
     def _positions(self, value):
         data = str(value).encode()
-        return [int.from_bytes(hashlib.blake2b(data, digest_size=8, person=f'cms{i}'.encode()).digest(), 'little')
-                % self.width for i in range(self.depth)]
+        return [
+            int.from_bytes(hashlib.blake2b(data, digest_size=8, person=f'cms{i}'.encode()).digest(), 'little')
+            % self.width
+            for i in range(self.depth)
+        ]
 
     def add(self, value):
         self.total += 1

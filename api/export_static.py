@@ -12,6 +12,7 @@ ordenados, sin vacíos ni "Todos") al archivo con su respuesta. El frontend
 Uso:
     ARTIFACTS_PATH=artifacts python -m api.export_static frontend/public/data
 """
+
 import json
 import shutil
 import sys
@@ -48,18 +49,34 @@ def specs():
         'quality': (main.quality, [{}], []),
         'eda/options': (main.eda_options, [{}], []),
         'eda/technical': (main.eda_technical, [{}], []),
-        'eda': (main.eda, grid(year=years, department=departments,
-                               metric=['processes', 'tender_amount_pen', 'award_amount_pen'], limit=[25]),
-                ['year', 'department', 'metric', 'limit']),
+        'eda': (
+            main.eda,
+            grid(
+                year=years,
+                department=departments,
+                metric=['processes', 'tender_amount_pen', 'award_amount_pen'],
+                limit=[25],
+            ),
+            ['year', 'department', 'metric', 'limit'],
+        ),
         'concentration': (main.concentration, grid(year=years, buyer_level=levels), ['year', 'buyer_level']),
-        'competition': (main.competition, grid(dimension=competition['dimensions'], year=['Todos'] + years[1:]),
-                        ['dimension', 'year']),
+        'competition': (
+            main.competition,
+            grid(dimension=competition['dimensions'], year=['Todos'] + years[1:]),
+            ['dimension', 'year'],
+        ),
         'similarity': (main.similarity, [{}], []),
-        'similarity/pairs': (main.similarity_pairs, grid(config=[r['config'] for r in lsh], status=['TP', 'FP', 'FN']),
-                             ['config', 'status']),
+        'similarity/pairs': (
+            main.similarity_pairs,
+            grid(config=[r['config'] for r in lsh], status=['TP', 'FP', 'FN']),
+            ['config', 'status'],
+        ),
         'ann': (main.ann, [{}], []),
-        'ann/neighbors': (main.ann_neighbors, grid(query=[q['ocid'] for q in ann['queries']], config=ann['configs']),
-                          ['query', 'config']),
+        'ann/neighbors': (
+            main.ann_neighbors,
+            grid(query=[q['ocid'] for q in ann['queries']], config=ann['configs']),
+            ['query', 'config'],
+        ),
         'streaming': (main.streaming, [{}], []),
         'association': (main.association, grid(year=['Todos'] + years[1:]), ['year']),
         'discussion': (main.discussion, [{}], []),
@@ -82,11 +99,13 @@ def export(output):
                 print(f'  omitido {endpoint} {params}: {exc.detail}', flush=True)
                 continue
             name = f'{number}.json'
-            (folder / name).write_text(json.dumps(response, ensure_ascii=False, default=str, allow_nan=False),
-                                       encoding='utf-8')
+            (folder / name).write_text(
+                json.dumps(response, ensure_ascii=False, default=str, allow_nan=False), encoding='utf-8'
+            )
             files[canonical(params)] = name
-        (folder / 'index.json').write_text(json.dumps(dict(params=supported, files=files), ensure_ascii=False),
-                                           encoding='utf-8')
+        (folder / 'index.json').write_text(
+            json.dumps(dict(params=supported, files=files), ensure_ascii=False), encoding='utf-8'
+        )
         total += len(files)
         print(f'{endpoint}: {len(files)} respuestas', flush=True)
     size = sum(p.stat().st_size for p in output.rglob('*.json'))

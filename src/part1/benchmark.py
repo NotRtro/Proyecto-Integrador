@@ -8,6 +8,7 @@ Motor: Spark. Para cada operación se mide:
 - claridad: el código fuente de ambas versiones y sus líneas efectivas, para
   mostrarlos lado a lado en el reporte.
 """
+
 import ast
 import inspect
 import re
@@ -33,7 +34,7 @@ def code_lines(function):
     body = ast.parse(source).body[0].body
     if body and isinstance(body[0], ast.Expr) and isinstance(getattr(body[0], 'value', None), ast.Constant):
         body = body[1:]
-    lines = source.splitlines()[body[0].lineno - 1:body[-1].end_lineno]
+    lines = source.splitlines()[body[0].lineno - 1 : body[-1].end_lineno]
     return sum(1 for line in lines if line.strip() and not line.strip().startswith('#'))
 
 
@@ -88,13 +89,23 @@ def run_benchmark(processes, suppliers):
                 (plan, shuffles), operators = rdd_plan(query), None
             plans[f'{operation}_{engine}'] = plan
             function = getattr(module, operation)
-            snippets[operation][engine] = dict(code=textwrap.dedent(inspect.getsource(function)),
-                                               lines=code_lines(function))
-            results.append(dict(
-                operation=operation, description=DESCRIPTIONS[operation], engine=engine,
-                warmup_seconds=warmup, median_seconds=statistics.median(times),
-                **{f'run{i + 1}': t for i, t in enumerate(times)},
-                input_partitions=partitions, shuffles=shuffles, code_lines=code_lines(function),
-                operators=' → '.join(reversed(operators)) if operators else None,
-                groups=len(values), equivalent=True))
+            snippets[operation][engine] = dict(
+                code=textwrap.dedent(inspect.getsource(function)), lines=code_lines(function)
+            )
+            results.append(
+                dict(
+                    operation=operation,
+                    description=DESCRIPTIONS[operation],
+                    engine=engine,
+                    warmup_seconds=warmup,
+                    median_seconds=statistics.median(times),
+                    **{f'run{i + 1}': t for i, t in enumerate(times)},
+                    input_partitions=partitions,
+                    shuffles=shuffles,
+                    code_lines=code_lines(function),
+                    operators=' → '.join(reversed(operators)) if operators else None,
+                    groups=len(values),
+                    equivalent=True,
+                )
+            )
     return results, plans, snippets

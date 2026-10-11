@@ -17,6 +17,7 @@ Tipo de regla, para no presentar como hallazgo lo que dicta la ley:
 - datos faltantes: incluye "sin dato"; describe la calidad del registro, no la compra.
 - informativa: el resto.
 """
+
 from src.part5.transactions import MISSING, attribute
 
 NORMATIVE_ATTRIBUTES = {'MODALIDAD', 'MONTO', 'CAT'}
@@ -55,9 +56,20 @@ def targeted_rules(itemsets, n, consequent, min_count, min_lift, max_antecedent=
         confidence = count / antecedent_count
         lift = confidence / base_rate
         if lift >= min_lift:
-            rules.append(dict(antecedent=' ∧ '.join(sorted(antecedent)), consequent=consequent, count=count,
-                              antecedent_count=antecedent_count, support=count / n, confidence=confidence, lift=lift,
-                              base_rate=base_rate, size=len(itemset), kind=rule_kind(itemset)))
+            rules.append(
+                dict(
+                    antecedent=' ∧ '.join(sorted(antecedent)),
+                    consequent=consequent,
+                    count=count,
+                    antecedent_count=antecedent_count,
+                    support=count / n,
+                    confidence=confidence,
+                    lift=lift,
+                    base_rate=base_rate,
+                    size=len(itemset),
+                    kind=rule_kind(itemset),
+                )
+            )
     return sorted(rules, key=lambda r: (-r['lift'], -r['count']))
 
 
@@ -74,8 +86,16 @@ def metrics_by_year(antecedent, consequent, grouped):
         with_consequent = sum(c for basket, c in entries if consequent <= basket)
         confidence = joint / with_antecedent if with_antecedent else 0.0
         lift = confidence / (with_consequent / total) if with_consequent else 0.0
-        rows.append(dict(year=year, support=joint / total if total else 0.0, confidence=confidence, lift=lift,
-                         count=joint, transactions=total))
+        rows.append(
+            dict(
+                year=year,
+                support=joint / total if total else 0.0,
+                confidence=confidence,
+                lift=lift,
+                count=joint,
+                transactions=total,
+            )
+        )
     return rows
 
 
@@ -92,9 +112,14 @@ def pick(candidates, limit, source, chosen, unique_items=False):
     for rule in candidates:
         antecedent = frozenset(rule['antecedent'].split(' ∧ '))
         items = antecedent | {rule['consequent']}
-        redundant = any(items == c['_items'] or (rule['consequent'] == c['consequent']
-                                                 and (antecedent <= c['_antecedent'] or c['_antecedent'] <= antecedent))
-                        for c in chosen)
+        redundant = any(
+            items == c['_items']
+            or (
+                rule['consequent'] == c['consequent']
+                and (antecedent <= c['_antecedent'] or c['_antecedent'] <= antecedent)
+            )
+            for c in chosen
+        )
         if unique_items:
             redundant = redundant or any(antecedent & c['_antecedent'] for c in chosen if c['source'] == source)
         if not redundant:
@@ -106,5 +131,7 @@ def pick(candidates, limit, source, chosen, unique_items=False):
 
 def automatic_reading(rule):
     """Lectura literal de las métricas. No es una interpretación: esa la escribe el equipo."""
-    return (f"Entre los procesos con {rule['antecedent']}, el {rule['confidence']:.1%} tiene {rule['consequent']} "
-            f"(soporte {rule['support']:.1%}, lift {rule['lift']:.2f}).")
+    return (
+        f"Entre los procesos con {rule['antecedent']}, el {rule['confidence']:.1%} tiene {rule['consequent']} "
+        f"(soporte {rule['support']:.1%}, lift {rule['lift']:.2f})."
+    )

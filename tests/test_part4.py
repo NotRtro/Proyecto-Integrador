@@ -13,7 +13,7 @@ def test_dgim_time_window_respects_bound():
     for window in [1, 7, 30]:
         dgim, history, day = DGIM(window), deque(), 0
         for _ in range(5000):
-            day += rng.random() < 0.3          # varios eventos por día
+            day += rng.random() < 0.3  # varios eventos por día
             bit = rng.random() < 0.4
             dgim.add(bit, day)
             history.append((day, bit))
@@ -24,14 +24,14 @@ def test_dgim_time_window_respects_bound():
 
 
 def test_bloom_has_no_false_negatives_and_fpr_near_theory():
-    bloom = BloomFilter(2 ** 14, 5)
+    bloom = BloomFilter(2**14, 5)
     inserted = [f'in{i}' for i in range(1500)]
     for value in inserted:
         bloom.add(value)
     assert all(value in bloom for value in inserted)
     observed = sum(f'out{i}' in bloom for i in range(20000)) / 20000
-    assert observed == pytest.approx(theoretical_fpr(2 ** 14, 5, 1500), abs=0.01)
-    assert optimal_hashes(2 ** 14, 1500) == 8
+    assert observed == pytest.approx(theoretical_fpr(2**14, 5, 1500), abs=0.01)
+    assert optimal_hashes(2**14, 1500) == 8
 
 
 def test_count_min_never_underestimates_and_meets_bound():

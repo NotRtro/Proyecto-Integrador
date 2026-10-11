@@ -15,6 +15,7 @@ Uso:
 Luego:
     RAW_PATH=data/dev/raw PROCESSED_PATH=data/dev/processed ARTIFACTS_PATH=data/dev/artifacts python -m src.run_all
 """
+
 import argparse
 import gzip
 import hashlib
@@ -52,7 +53,8 @@ def main():
         summary[name] = dict(source=source.name, lines=total, kept=kept)
         print(f'{name}: {kept:,} de {total:,} líneas', flush=True)
     (args.output / 'dev_sample.json').write_text(
-        json.dumps(dict(fraction=args.fraction, seed=SEED, files=summary), indent=2), encoding='utf-8')
+        json.dumps(dict(fraction=args.fraction, seed=SEED, files=summary), indent=2), encoding='utf-8'
+    )
 
 
 if __name__ == '__main__':

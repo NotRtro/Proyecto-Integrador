@@ -15,9 +15,11 @@ Artefactos (artifacts/eda/):
     rdd_dataframe_benchmark.csv, execution_plans.json, code_snippets.json
     partitioning_experiment.json, spark_vs_pandas.csv
 """
+
 from pyspark.sql import functions as F
 
-from src.common import StepTimer, processes as read_processes, save_csv, save_json
+from src.common import StepTimer, save_csv, save_json
+from src.common import processes as read_processes
 from src.config import PROCESSED, YEARS, spark_session
 from src.ingestion.validate_files import input_files
 from src.part1 import concentration, eda
@@ -49,11 +51,17 @@ def run(spark):
         export('single_bidder_rates', eda.single_bidder_rates(processes))
         # La categoría viene del proceso; se agrega aquí porque supplier_frame solo trae contexto geográfico.
         suppliers_with_category = suppliers.join(processes.select('ocid', 'category'), 'ocid', 'left')
-        supplier_cube = (suppliers_with_category
-                         .groupBy('year', 'month', 'department', 'category', 'buyer_id', 'buyer_name',
-                                  'supplier_id', 'supplier_name', 'supplier_type')
-                         .agg(F.sum('allocated_amount_pen').alias('allocated_amount_pen'),
-                              F.countDistinct('ocid').alias('processes')))
+        supplier_cube = suppliers_with_category.groupBy(
+            'year',
+            'month',
+            'department',
+            'category',
+            'buyer_id',
+            'buyer_name',
+            'supplier_id',
+            'supplier_name',
+            'supplier_type',
+        ).agg(F.sum('allocated_amount_pen').alias('allocated_amount_pen'), F.countDistinct('ocid').alias('processes'))
         export('supplier_cube', supplier_cube)
 
     with timer.step('concentración (Q1)'):
@@ -63,10 +71,18 @@ def run(spark):
         export('buyer_supplier_hhi', buyer_hhi)
         export('buyer_hhi_summary', concentration.buyer_hhi_summary(buyer_hhi))
         export('department_supplier_hhi', concentration.department_supplier_concentration(suppliers))
-        export('top_buyers', concentration.top_rankings(processes, ['year'], 'buyer_id', ['buyer_name', 'buyer_level'],
-                                                        'award_amount_pen'))
-        export('top_suppliers', concentration.top_rankings(suppliers, ['year'], 'supplier_id',
-                                                           ['supplier_name', 'supplier_type'], 'allocated_amount_pen'))
+        export(
+            'top_buyers',
+            concentration.top_rankings(
+                processes, ['year'], 'buyer_id', ['buyer_name', 'buyer_level'], 'award_amount_pen'
+            ),
+        )
+        export(
+            'top_suppliers',
+            concentration.top_rankings(
+                suppliers, ['year'], 'supplier_id', ['supplier_name', 'supplier_type'], 'allocated_amount_pen'
+            ),
+        )
         buyer_hhi.unpersist()
 
     with timer.step('RDD frente a DataFrame'):
@@ -79,8 +95,10 @@ def run(spark):
     processes.unpersist()
     suppliers.unpersist()
     with timer.step('experimento de particionamiento'):
-        save_json('eda/partitioning_experiment.json',
-                  run_experiment(spark, [str(p) for p in input_files()], YEARS[len(YEARS) // 2]))
+        save_json(
+            'eda/partitioning_experiment.json',
+            run_experiment(spark, [str(p) for p in input_files()], YEARS[len(YEARS) // 2]),
+        )
     with timer.step('Spark frente a pandas'):
         save_csv('eda/spark_vs_pandas.csv', run_comparison(spark))
     save_json('eda/part1_timings.json', timer.steps)

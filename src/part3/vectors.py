@@ -14,6 +14,7 @@ Decisiones:
   exacta como HNSW e IVF. Todas las comparaciones usan exactamente los mismos vectores.
 - Normalización L2: el producto interno es la similitud coseno.
 """
+
 import numpy as np
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -28,12 +29,21 @@ MIN_DF = 3
 
 def build_vectors(texts):
     """Matriz densa float32 normalizada (documentos x DIMENSIONS) y métricas de la reducción."""
-    vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_features=MAX_FEATURES, min_df=MIN_DF,
-                                 sublinear_tf=True, dtype=np.float32)
+    vectorizer = TfidfVectorizer(
+        ngram_range=(1, 2), max_features=MAX_FEATURES, min_df=MIN_DF, sublinear_tf=True, dtype=np.float32
+    )
     tfidf = vectorizer.fit_transform(texts)
     svd = TruncatedSVD(n_components=DIMENSIONS, random_state=SEED, algorithm='randomized', n_iter=5)
     reduced = normalize(svd.fit_transform(tfidf)).astype(np.float32)
-    info = dict(documents=tfidf.shape[0], vocabulary=len(vectorizer.vocabulary_), dimensions=DIMENSIONS,
-                explained_variance=float(svd.explained_variance_ratio_.sum()), tfidf_nonzeros=int(tfidf.nnz),
-                ngram_range=[1, 2], min_df=MIN_DF, sublinear_tf=True, max_features=MAX_FEATURES)
+    info = dict(
+        documents=tfidf.shape[0],
+        vocabulary=len(vectorizer.vocabulary_),
+        dimensions=DIMENSIONS,
+        explained_variance=float(svd.explained_variance_ratio_.sum()),
+        tfidf_nonzeros=int(tfidf.nnz),
+        ngram_range=[1, 2],
+        min_df=MIN_DF,
+        sublinear_tf=True,
+        max_features=MAX_FEATURES,
+    )
     return np.ascontiguousarray(reduced), info

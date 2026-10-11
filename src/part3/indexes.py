@@ -19,6 +19,7 @@ Cómo funcionan (resumen; la web lo explica con diagramas):
 La latencia se mide consulta por consulta en un solo hilo, para que las tres
 estrategias compitan en igualdad. La construcción usa varios hilos.
 """
+
 import time
 
 import faiss
@@ -68,7 +69,7 @@ def ann_search(index, vectors, queries, k):
     neighbors, latencies = [], []
     for q in queries:
         start = time.perf_counter()
-        _, labels = index.search(vectors[q:q + 1], k + 1)
+        _, labels = index.search(vectors[q : q + 1], k + 1)
         latencies.append(time.perf_counter() - start)
         found = [int(j) for j in labels[0] if j != q and j >= 0][:k]
         neighbors.append(found + [-1] * (k - len(found)))

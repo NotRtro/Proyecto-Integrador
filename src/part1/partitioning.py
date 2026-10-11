@@ -15,6 +15,7 @@ Motor: Spark. Cuatro preguntas, cada una medida en el clúster:
    completas), pero si se cachea, varias agregaciones por la misma clave lo reutilizan
    y Spark omite sus propios shuffles.
 """
+
 import re
 import statistics
 import time
@@ -85,9 +86,13 @@ def parquet_folders(table, **partition):
 def input_partitions(spark, raw_paths):
     raw = spark.read.text([str(Path(p).resolve()) for p in raw_paths])
     target = int(spark.conf.get('spark.default.parallelism', '8')) * 2
-    return dict(files=len(raw_paths), read_partitions=raw.rdd.getNumPartitions(), after_repartition=target,
-                explanation='Gzip no es divisible: una partición por archivo. build_processes reparticiona '
-                            f'a {target} antes de parsear para usar todos los núcleos.')
+    return dict(
+        files=len(raw_paths),
+        read_partitions=raw.rdd.getNumPartitions(),
+        after_repartition=target,
+        explanation='Gzip no es divisible: una partición por archivo. build_processes reparticiona '
+        f'a {target} antes de parsear para usar todos los núcleos.',
+    )
 
 
 def pruning(spark, year):
@@ -99,9 +104,13 @@ def pruning(spark, year):
     if rows != by_date.count():
         raise AssertionError('Los dos filtros deberían seleccionar las mismas filas')
     return dict(
-        year=year, rows=rows, folders_total=total, folders_read_with_pruning=matching,
+        year=year,
+        rows=rows,
+        folders_total=total,
+        folders_read_with_pruning=matching,
         partition_column=dict(seconds=measure(by_partition.count), **scan_filters(by_partition)),
-        other_column=dict(seconds=measure(by_date.count), **scan_filters(by_date)))
+        other_column=dict(seconds=measure(by_date.count), **scan_filters(by_date)),
+    )
 
 
 def shuffle_partitions(spark):
@@ -116,8 +125,14 @@ def shuffle_partitions(spark):
                 spark.conf.set('spark.sql.shuffle.partitions', str(partitions))
                 query = processes.groupBy('buyer_id', 'year').agg(F.sum('award_amount_pen'))
                 seconds = measure(query.collect)
-                rows.append(dict(adaptive=adaptive == 'true', shuffle_partitions=partitions, seconds=seconds,
-                                 result_partitions=query.rdd.getNumPartitions()))
+                rows.append(
+                    dict(
+                        adaptive=adaptive == 'true',
+                        shuffle_partitions=partitions,
+                        seconds=seconds,
+                        result_partitions=query.rdd.getNumPartitions(),
+                    )
+                )
     finally:
         for key, value in original.items():
             spark.conf.set(key, value)
@@ -140,7 +155,10 @@ def key_repartition(spark):
     direct = two_aggregations(processes)
     single = dict(
         direct=dict(exchanges=exchanges(single_direct), seconds=measure(single_direct.collect)),
-        repartition_first=dict(exchanges=exchanges(single_repartitioned), seconds=measure(single_repartitioned.collect)))
+        repartition_first=dict(
+            exchanges=exchanges(single_repartitioned), seconds=measure(single_repartitioned.collect)
+        ),
+    )
     two = dict(direct=dict(exchanges=exchanges(direct), seconds=measure(direct.collect)))
     partitioned_input = processes.repartition('buyer_id').cache()
     partitioned_input.count()
@@ -156,7 +174,9 @@ def run_experiment(spark, raw_paths, year):
         pruning=pruning(spark, year),
         shuffle_partitions=shuffle_partitions(spark),
         key_repartition=key_repartition(spark),
-        cluster=dict(default_parallelism=spark.sparkContext.defaultParallelism,
-                     executor_cores=spark.conf.get('spark.executor.cores', None),
-                     cores_max=spark.conf.get('spark.cores.max', None)),
+        cluster=dict(
+            default_parallelism=spark.sparkContext.defaultParallelism,
+            executor_cores=spark.conf.get('spark.executor.cores', None),
+            cores_max=spark.conf.get('spark.cores.max', None),
+        ),
     )

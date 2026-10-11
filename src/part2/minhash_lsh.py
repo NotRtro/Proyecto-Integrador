@@ -15,6 +15,7 @@ LSH: la firma se divide en b bandas de r filas; dos documentos son candidatos si
 coinciden en todas las filas de alguna banda. P[candidato] = 1 - (1 - s^r)^b, una curva
 S con umbral aproximado (1/b)^(1/r).
 """
+
 import hashlib
 
 import numpy as np
@@ -25,14 +26,19 @@ MERSENNE = (1 << 31) - 1
 def coefficients(hashes, seed):
     """Coeficientes (a, b) de las funciones hash; mismos para todos los documentos."""
     rng = np.random.default_rng(seed)
-    return (rng.integers(1, MERSENNE, size=hashes, dtype=np.uint64),
-            rng.integers(0, MERSENNE, size=hashes, dtype=np.uint64))
+    return (
+        rng.integers(1, MERSENNE, size=hashes, dtype=np.uint64),
+        rng.integers(0, MERSENNE, size=hashes, dtype=np.uint64),
+    )
 
 
 def token_hashes(tokens):
     """Hash estable (independiente del proceso de Python) de cada shingle, módulo p."""
-    return np.fromiter((int.from_bytes(hashlib.blake2b(t.encode(), digest_size=8).digest(), 'little') % MERSENNE
-                        for t in tokens), dtype=np.uint64, count=len(tokens))
+    return np.fromiter(
+        (int.from_bytes(hashlib.blake2b(t.encode(), digest_size=8).digest(), 'little') % MERSENNE for t in tokens),
+        dtype=np.uint64,
+        count=len(tokens),
+    )
 
 
 def signature(tokens, hashes=128, seed=42, coeffs=None):
@@ -52,8 +58,10 @@ def estimate(sig_a, sig_b, k=None):
 
 def band_keys(sig, bands, rows):
     """Clave (banda, hash de sus r componentes) por cada banda de la firma."""
-    return [(band, hashlib.blake2b(sig[band * rows:(band + 1) * rows].tobytes(), digest_size=8).hexdigest())
-            for band in range(bands)]
+    return [
+        (band, hashlib.blake2b(sig[band * rows : (band + 1) * rows].tobytes(), digest_size=8).hexdigest())
+        for band in range(bands)
+    ]
 
 
 def candidate_probability(similarity, bands, rows):

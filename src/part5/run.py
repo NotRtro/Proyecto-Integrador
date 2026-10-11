@@ -18,13 +18,15 @@ Pasos:
 Artefactos (artifacts/association/): algorithm_benchmark.csv, frequent_itemsets_*.csv,
 rules.csv, single_bidder_rules.csv, missing_report.csv, selected_rules.json.
 """
+
 import json
 import time
 
 from pyspark.ml.fpm import FPGrowth
 from pyspark.sql import functions as F
 
-from src.common import StepTimer, features as read_features, sample_processes, save_csv, save_json
+from src.common import StepTimer, sample_processes, save_csv, save_json
+from src.common import features as read_features
 from src.config import APRIORI_SAMPLE, spark_session
 from src.part5.apriori import apriori
 from src.part5.rules import automatic_reading, metrics_by_year, pick, rule_kind, targeted_rules
@@ -65,10 +67,26 @@ def compare_algorithms(spark):
         if found != exact:
             raise AssertionError(f'Apriori y FP-Growth difieren con soporte {support}')
         for algorithm, seconds in [('Apriori', apriori_seconds), ('FP-Growth', fpgrowth_seconds)]:
-            rows.append(dict(algorithm=algorithm, scope='same_sample', support=support, seconds=seconds,
-                             transactions=len(sample), itemsets=len(exact), equivalent=True))
-        itemsets.extend(dict(min_support=support, items=json.dumps(sorted(k), ensure_ascii=False), frequency=v,
-                             support=v / len(sample)) for k, v in exact.items())
+            rows.append(
+                dict(
+                    algorithm=algorithm,
+                    scope='same_sample',
+                    support=support,
+                    seconds=seconds,
+                    transactions=len(sample),
+                    itemsets=len(exact),
+                    equivalent=True,
+                )
+            )
+        itemsets.extend(
+            dict(
+                min_support=support,
+                items=json.dumps(sorted(k), ensure_ascii=False),
+                frequency=v,
+                support=v / len(sample),
+            )
+            for k, v in exact.items()
+        )
     frame.unpersist()
     return rows, itemsets
 
@@ -81,10 +99,26 @@ def full_rules(tx, total):
         model = FPGrowth(itemsCol='items', minSupport=support, minConfidence=RULE_CONFIDENCE).fit(tx)
         found = model.freqItemsets.collect()
         raw_rules = model.associationRules.collect() if support == RULE_SUPPORT else []
-        benchmark.append(dict(algorithm='FP-Growth', scope='full', support=support, seconds=time.perf_counter() - start,
-                              transactions=total, itemsets=len(found), equivalent=None))
-        itemsets.extend(dict(min_support=support, items=json.dumps(sorted(r['items']), ensure_ascii=False),
-                             frequency=r['freq'], support=r['freq'] / total) for r in found)
+        benchmark.append(
+            dict(
+                algorithm='FP-Growth',
+                scope='full',
+                support=support,
+                seconds=time.perf_counter() - start,
+                transactions=total,
+                itemsets=len(found),
+                equivalent=None,
+            )
+        )
+        itemsets.extend(
+            dict(
+                min_support=support,
+                items=json.dumps(sorted(r['items']), ensure_ascii=False),
+                frequency=r['freq'],
+                support=r['freq'] / total,
+            )
+            for r in found
+        )
         rules.extend(raw_rules)
     return benchmark, itemsets, rules
 
@@ -102,8 +136,16 @@ def rules_by_year(raw_rules, tx):
             continue
         kind = rule_kind(antecedent | consequent)
         for metrics in metrics_by_year(antecedent, consequent, grouped):
-            rows.append(dict(antecedent=' ∧ '.join(sorted(antecedent)), consequent=' ∧ '.join(sorted(consequent)),
-                             kind=kind, antecedent_size=len(antecedent), size=len(antecedent | consequent), **metrics))
+            rows.append(
+                dict(
+                    antecedent=' ∧ '.join(sorted(antecedent)),
+                    consequent=' ∧ '.join(sorted(consequent)),
+                    kind=kind,
+                    antecedent_size=len(antecedent),
+                    size=len(antecedent | consequent),
+                    **metrics,
+                )
+            )
     return rows
 
 
@@ -116,10 +158,17 @@ def non_competitive_modalities(informed):
     """
     modality = F.filter('items', lambda i: i.startswith('MODALIDAD='))[0]
     single = F.array_contains('items', 'POSTORES=uno').cast('int')
-    rows = (informed.groupBy(modality.alias('modality')).agg(F.avg(single).alias('rate'), F.count('*').alias('n'))
-            .collect())
-    return sorted((dict(modality=r['modality'], single_bidder_rate=r['rate'], processes=r['n'])
-                   for r in rows if r['rate'] > NON_COMPETITIVE_RATE), key=lambda e: -e['single_bidder_rate'])
+    rows = (
+        informed.groupBy(modality.alias('modality')).agg(F.avg(single).alias('rate'), F.count('*').alias('n')).collect()
+    )
+    return sorted(
+        (
+            dict(modality=r['modality'], single_bidder_rate=r['rate'], processes=r['n'])
+            for r in rows
+            if r['rate'] > NON_COMPETITIVE_RATE
+        ),
+        key=lambda e: -e['single_bidder_rate'],
+    )
 
 
 def single_bidder_rules(tx):
@@ -147,18 +196,31 @@ def missing_report(tx):
     """Proporción de "sin dato" por atributo y año."""
     exploded = tx.select('year', F.explode('items').alias('item'))
     parts = F.split('item', '=')
-    return (exploded.withColumn('attribute', parts[0]).withColumn('missing', (parts[1] == MISSING).cast('int'))
-            .groupBy('attribute', 'year').agg(F.count('*').alias('processes'), F.sum('missing').alias('missing'))
-            .withColumn('missing_share', F.col('missing') / F.col('processes'))
-            .orderBy('attribute', 'year'))
+    return (
+        exploded.withColumn('attribute', parts[0])
+        .withColumn('missing', (parts[1] == MISSING).cast('int'))
+        .groupBy('attribute', 'year')
+        .agg(F.count('*').alias('processes'), F.sum('missing').alias('missing'))
+        .withColumn('missing_share', F.col('missing') / F.col('processes'))
+        .orderBy('attribute', 'year')
+    )
 
 
 def select_rules(general, targeted):
     """Ocho o más reglas para interpretar: informativas generales y de postor único, sin redundancia."""
     chosen = []
-    candidates = sorted((r for r in general if r['year'] == 'Todos' and r['kind'] == 'informativa'
-                         and r['support'] >= RULE_SUPPORT and r['confidence'] >= RULE_CONFIDENCE and r['size'] <= 3),
-                        key=lambda r: (-r['lift'], -r['support']))
+    candidates = sorted(
+        (
+            r
+            for r in general
+            if r['year'] == 'Todos'
+            and r['kind'] == 'informativa'
+            and r['support'] >= RULE_SUPPORT
+            and r['confidence'] >= RULE_CONFIDENCE
+            and r['size'] <= 3
+        ),
+        key=lambda r: (-r['lift'], -r['support']),
+    )
     pick(candidates, SELECTED_GENERAL, 'general', chosen)
     single = [r for r in targeted if r['consequent'] == 'POSTORES=uno' and r['kind'] == 'informativa']
     pick(single, SELECTED_SINGLE_BIDDER, 'postor único (Q2)', chosen, unique_items=True)
@@ -188,16 +250,41 @@ def run(spark):
     save_csv('association/algorithm_benchmark.csv', benchmark + full_benchmark)
     save_csv('association/frequent_itemsets_apriori.csv', sample_itemsets)
     save_csv('association/frequent_itemsets_fpgrowth.csv', full_itemsets)
-    save_csv('association/rules.csv', general, ['year', 'antecedent', 'consequent', 'kind', 'support', 'confidence',
-                                                'lift', 'antecedent_size', 'size', 'count', 'transactions'])
+    save_csv(
+        'association/rules.csv',
+        general,
+        [
+            'year',
+            'antecedent',
+            'consequent',
+            'kind',
+            'support',
+            'confidence',
+            'lift',
+            'antecedent_size',
+            'size',
+            'count',
+            'transactions',
+        ],
+    )
     save_csv('association/single_bidder_rules.csv', targeted)
     save_csv('association/missing_report.csv', missing)
     selected = select_rules(general, targeted)
-    save_json('association/selected_rules.json', dict(
-        rules=selected, required=8, found=len(selected), status='complete' if len(selected) >= 8 else 'insufficient_evidence',
-        note='automatic_reading es una lectura literal de las métricas. La interpretación en contexto la escribe el '
-             'equipo en frontend/src/content/rules.json, usando rule_id como clave.',
-        transactions=total, competitive_transactions=informed, non_competitive_modalities=non_competitive))
+    save_json(
+        'association/selected_rules.json',
+        dict(
+            rules=selected,
+            required=8,
+            found=len(selected),
+            status='complete' if len(selected) >= 8 else 'insufficient_evidence',
+            note='automatic_reading es una lectura literal de las métricas. La interpretación en contexto la escribe '
+            'el '
+            'equipo en frontend/src/content/rules.json, usando rule_id como clave.',
+            transactions=total,
+            competitive_transactions=informed,
+            non_competitive_modalities=non_competitive,
+        ),
+    )
     save_json('association/part5_timings.json', timer.steps)
     tx.unpersist()
 

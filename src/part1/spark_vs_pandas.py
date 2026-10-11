@@ -9,6 +9,7 @@ manejables en local?": con ~200 mil procesos, pandas en una sola máquina suele 
 en una agregación simple; la ventaja de Spark aparece al parsear JSON anidado, al
 escalar el volumen o cuando los datos no caben en la memoria de un solo proceso.
 """
+
 import time
 
 import pandas as pd
@@ -25,8 +26,11 @@ def spark_aggregate(spark, fraction):
     df = spark.read.parquet(str(PROCESSED / 'processes')).select(*COLUMNS)
     if fraction < 1:
         df = df.sample(fraction=fraction, seed=SEED)
-    return df.groupBy('year', 'category').agg(F.count('*').alias('processes'),
-                                              F.sum('tender_amount_pen').alias('amount')).collect()
+    return (
+        df.groupBy('year', 'category')
+        .agg(F.count('*').alias('processes'), F.sum('tender_amount_pen').alias('amount'))
+        .collect()
+    )
 
 
 def pandas_aggregate(fraction):
@@ -35,8 +39,9 @@ def pandas_aggregate(fraction):
     df = table.to_table(columns=COLUMNS).to_pandas()
     if fraction < 1:
         df = df.sample(frac=fraction, random_state=SEED)
-    result = df.groupby(['year', 'category'], dropna=False).agg(processes=('ocid', 'size'),
-                                                                amount=('tender_amount_pen', 'sum'))
+    result = df.groupby(['year', 'category'], dropna=False).agg(
+        processes=('ocid', 'size'), amount=('tender_amount_pen', 'sum')
+    )
     return result, df.memory_usage(deep=True).sum()
 
 
@@ -51,8 +56,15 @@ def run_comparison(spark):
         start = time.perf_counter()
         pandas_result, memory = pandas_aggregate(fraction)
         pandas_seconds = time.perf_counter() - start
-        rows.append(dict(fraction=fraction, processes=int(pandas_result.processes.sum()),
-                         spark_seconds=spark_seconds, pandas_seconds=pandas_seconds,
-                         pandas_memory_mb=memory / 1e6, groups_spark=len(spark_rows),
-                         groups_pandas=len(pandas_result)))
+        rows.append(
+            dict(
+                fraction=fraction,
+                processes=int(pandas_result.processes.sum()),
+                spark_seconds=spark_seconds,
+                pandas_seconds=pandas_seconds,
+                pandas_memory_mb=memory / 1e6,
+                groups_spark=len(spark_rows),
+                groups_pandas=len(pandas_result),
+            )
+        )
     return pd.DataFrame(rows)

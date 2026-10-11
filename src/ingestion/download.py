@@ -12,6 +12,7 @@ Uso:
     python -m src.ingestion.download            # años de ANALYSIS_YEARS
     python -m src.ingestion.download --force    # vuelve a descargar aunque exista
 """
+
 import argparse
 import hashlib
 import json
@@ -83,7 +84,7 @@ def fetch(url, destination, expected_bytes):
                         print(f'  {destination.name}: {received / expected_bytes:.0%}', flush=True)
                         last_report = time.monotonic()
         except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
-            wait = 2 ** attempt
+            wait = 2**attempt
             print(f'  Intento {attempt}/{RETRIES} falló ({exc}); reintento en {wait}s', flush=True)
             time.sleep(wait)
     size = partial.stat().st_size if partial.exists() else 0

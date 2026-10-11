@@ -10,6 +10,7 @@ falsos negativos; la tasa de falsos positivos tras n inserciones es
 Las k posiciones se derivan de dos hashes independientes (doble hashing mejorado,
 a + i·c + i², módulo m), equivalente en la práctica a k funciones distintas.
 """
+
 import hashlib
 import math
 

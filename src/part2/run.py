@@ -16,18 +16,31 @@ Artefactos (artifacts/similarity/):
     repeated_requirements.parquet, repeated_summary.csv, repeated_top_buyers.csv (Q3)
     case_candidates.json, methodology.json
 """
+
 import json
 
 import pandas as pd
 
-from src.common import StepTimer, features as read_features, processes as read_processes, save_csv, save_json
+from src.common import StepTimer, save_csv, save_json
+from src.common import features as read_features
+from src.common import processes as read_processes
 from src.config import ARTIFACTS, SAMPLE, SEED, spark_session
 from src.part2 import full_corpus, repeated
 from src.part2.evaluation import ERROR_HASHES, MAX_HASHES, THRESHOLDS, evaluate
 from src.processing.text_features import DOMAIN_STOPWORD_DF, SHINGLE_WIDTH
 
-PAIR_COLUMNS = ['config', 'left_ocid', 'right_ocid', 'jaccard', 'status', 'left_year', 'right_year',
-                'left_category', 'right_category', 'same_buyer']
+PAIR_COLUMNS = [
+    'config',
+    'left_ocid',
+    'right_ocid',
+    'jaccard',
+    'status',
+    'left_year',
+    'right_year',
+    'left_category',
+    'right_category',
+    'same_buyer',
+]
 
 
 def save_evaluation(result):
@@ -44,22 +57,38 @@ def save_evaluation(result):
 
 
 def methodology(result, summary):
-    truth = {row['threshold']: row['truth_pairs'] for row in result['grid'] if row['hashes'] == 128 and row['rows'] == 4}
+    truth = {
+        row['threshold']: row['truth_pairs'] for row in result['grid'] if row['hashes'] == 128 and row['rows'] == 4
+    }
     return dict(
         representation=f'Shingles de {SHINGLE_WIDTH} palabras de la descripción del requerimiento y sus ítems; '
-                       'sin la nomenclatura del proceso (tender_code) ni stopwords de dominio '
-                       f'(frecuencia documental > {DOMAIN_STOPWORD_DF:.0%}).',
+        'sin la nomenclatura del proceso (tender_code) ni stopwords de dominio '
+        f'(frecuencia documental > {DOMAIN_STOPWORD_DF:.0%}).',
         why_minhash='La pregunta es de solapamiento de conjuntos de palabras (Jaccard). SimHash aproxima la similitud '
-                    'coseno de vectores ponderados; para eso está la Parte III (TF-IDF).',
-        sample=dict(method='Entidades completas elegidas por SHA-256(buyer_id + semilla); ninguna aporta más del 20 %.',
-                    size=len(result['data']), buyers=result['buyers'], seed=SEED, truth_pairs_by_threshold=truth),
-        minhash=dict(hashes=ERROR_HASHES, max_hashes=MAX_HASHES, hash_family='(a·x + b) mod (2^31 - 1)',
-                     error='Ĵ = proporción de componentes iguales; error estándar teórico sqrt(J(1-J)/k).'),
-        lsh=dict(metric='Precisión y recall de los candidatos LSH antes de verificar con Jaccard exacto.',
-                 thresholds=THRESHOLDS),
+        'coseno de vectores ponderados; para eso está la Parte III (TF-IDF).',
+        sample=dict(
+            method='Entidades completas elegidas por SHA-256(buyer_id + semilla); ninguna aporta más del 20 %.',
+            size=len(result['data']),
+            buyers=result['buyers'],
+            seed=SEED,
+            truth_pairs_by_threshold=truth,
+        ),
+        minhash=dict(
+            hashes=ERROR_HASHES,
+            max_hashes=MAX_HASHES,
+            hash_family='(a·x + b) mod (2^31 - 1)',
+            error='Ĵ = proporción de componentes iguales; error estándar teórico sqrt(J(1-J)/k).',
+        ),
+        lsh=dict(
+            metric='Precisión y recall de los candidatos LSH antes de verificar con Jaccard exacto.',
+            thresholds=THRESHOLDS,
+        ),
         full_corpus=summary,
-        timings=dict(result['timings'], note='La verdad exacta (X·Xᵀ disperso) y las firmas de la muestra se calculan '
-                                             'en el driver; los candidatos LSH de la rejilla, en Spark.'),
+        timings=dict(
+            result['timings'],
+            note='La verdad exacta (X·Xᵀ disperso) y las firmas de la muestra se calculan '
+            'en el driver; los candidatos LSH de la rejilla, en Spark.',
+        ),
     )
 
 
@@ -82,10 +111,14 @@ def run(spark):
         pairs.toPandas().to_parquet(ARTIFACTS / 'similarity' / 'repeated_requirements.parquet', index=False)
         save_csv('similarity/repeated_summary.csv', repeated.summary(pairs).toPandas())
         save_csv('similarity/repeated_top_buyers.csv', repeated.top_buyers(pairs).toPandas())
-        save_json('similarity/case_candidates.json', dict(
-            note='Pares propuestos para revisión en SEACE (buscar por la nomenclatura tender_code). '
-                 'El equipo copia los revisados a frontend/src/content/similarity_cases.json con su interpretación.',
-            cases=repeated.case_candidates(pairs, features)))
+        save_json(
+            'similarity/case_candidates.json',
+            dict(
+                note='Pares propuestos para revisión en SEACE (buscar por la nomenclatura tender_code). '
+                'El equipo copia los revisados a frontend/src/content/similarity_cases.json con su interpretación.',
+                cases=repeated.case_candidates(pairs, features),
+            ),
+        )
         pairs.unpersist()
 
     # Compatibilidad con la API actual: los casos interpretados los escribe el equipo en
@@ -95,8 +128,10 @@ def run(spark):
     save_json('similarity/part2_timings.json', timer.steps)
     for df in cached + [features]:
         df.unpersist()
-    print(json.dumps({k: summary[k] for k in ['documents', 'possible_pairs', 'candidate_pairs', 'similar_pairs']}),
-          flush=True)
+    print(
+        json.dumps({k: summary[k] for k in ['documents', 'possible_pairs', 'candidate_pairs', 'similar_pairs']}),
+        flush=True,
+    )
 
 
 if __name__ == '__main__':

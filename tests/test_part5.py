@@ -38,18 +38,22 @@ def test_direct_contracting_single_bidder_is_normative():
 
 
 def test_pick_skips_redundant_refinements():
-    rules = [dict(antecedent='DEP=LIMA', consequent='POSTORES=uno', lift=3),
-             dict(antecedent='CAT=services ∧ DEP=LIMA', consequent='POSTORES=uno', lift=2.9),
-             dict(antecedent='NIVEL=local', consequent='POSTORES=uno', lift=2)]
+    rules = [
+        dict(antecedent='DEP=LIMA', consequent='POSTORES=uno', lift=3),
+        dict(antecedent='CAT=services ∧ DEP=LIMA', consequent='POSTORES=uno', lift=2.9),
+        dict(antecedent='NIVEL=local', consequent='POSTORES=uno', lift=2),
+    ]
     chosen = []
     pick(rules, 5, 'q2', chosen)
     assert [c['antecedent'] for c in chosen] == ['DEP=LIMA', 'NIVEL=local']
 
 
 def test_pick_unique_items_gives_diverse_rules():
-    rules = [dict(antecedent='DEP=LIMA ∧ MODALIDAD=X', consequent='POSTORES=uno', lift=5),
-             dict(antecedent='CAT=goods ∧ MODALIDAD=X', consequent='POSTORES=uno', lift=4.9),
-             dict(antecedent='NIVEL=local', consequent='POSTORES=uno', lift=2)]
+    rules = [
+        dict(antecedent='DEP=LIMA ∧ MODALIDAD=X', consequent='POSTORES=uno', lift=5),
+        dict(antecedent='CAT=goods ∧ MODALIDAD=X', consequent='POSTORES=uno', lift=4.9),
+        dict(antecedent='NIVEL=local', consequent='POSTORES=uno', lift=2),
+    ]
     chosen = []
     pick(rules, 5, 'q2', chosen, unique_items=True)
     assert [c['antecedent'] for c in chosen] == ['DEP=LIMA ∧ MODALIDAD=X', 'NIVEL=local']

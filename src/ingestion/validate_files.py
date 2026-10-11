@@ -10,6 +10,7 @@ Artefactos:
     metadata/schema.json            claves de primer nivel y sus tipos
     metadata/repairs_<archivo>.json líneas con varios objetos JSON concatenados
 """
+
 import gzip
 import hashlib
 import json
@@ -17,7 +18,7 @@ from collections import Counter
 
 from src.common import now, save_csv, save_json
 from src.config import RAW
-from src.ingestion.download import MANIFEST, SOURCE_PAGE, LICENSE
+from src.ingestion.download import LICENSE, MANIFEST, SOURCE_PAGE
 from src.ingestion.json_records import decode_line
 from src.processing.model import effective_date
 
@@ -26,7 +27,9 @@ def input_files():
     """Archivos .jsonl o .jsonl.gz en RAW; rechaza el mismo año en ambos formatos."""
     paths = sorted(set(RAW.glob('*.jsonl')) | set(RAW.glob('*.jsonl.gz')))
     if not paths:
-        raise FileNotFoundError(f'No hay archivos .jsonl o .jsonl.gz en {RAW}. Ejecutar: python -m src.ingestion.download')
+        raise FileNotFoundError(
+            f'No hay archivos .jsonl o .jsonl.gz en {RAW}. Ejecutar: python -m src.ingestion.download'
+        )
     stems = Counter(p.name.removesuffix('.gz') for p in paths)
     duplicated = [name for name, count in stems.items() if count > 1]
     if duplicated:
@@ -51,10 +54,20 @@ def provenance(path, downloads):
     """Procedencia registrada por download.py; si el archivo se copió a mano, se indica."""
     entry = next((d for d in downloads.values() if d.get('file') == path.name), None)
     if entry:
-        return dict(provenance='Descargado con src.ingestion.download', source_url=entry['url'],
-                    license=entry['license'], published_at=entry['last_modified'], downloaded_at=entry['downloaded_at'])
-    return dict(provenance='Copiado manualmente; sin registro de descarga', source_url=SOURCE_PAGE,
-                license=LICENSE, published_at=None, downloaded_at=None)
+        return dict(
+            provenance='Descargado con src.ingestion.download',
+            source_url=entry['url'],
+            license=entry['license'],
+            published_at=entry['last_modified'],
+            downloaded_at=entry['downloaded_at'],
+        )
+    return dict(
+        provenance='Copiado manualmente; sin registro de descarga',
+        source_url=SOURCE_PAGE,
+        license=LICENSE,
+        published_at=None,
+        downloaded_at=None,
+    )
 
 
 def scan(path, schema):
@@ -73,8 +86,14 @@ def scan(path, schema):
                 continue
             if len(records) > 1:
                 stats['recovered_concatenated_lines'] += 1
-                repairs.append(dict(file=path.name, line=line_number, objects=len(records),
-                                    action='Separación lógica de objetos JSON completos concatenados; original intacto'))
+                repairs.append(
+                    dict(
+                        file=path.name,
+                        line=line_number,
+                        objects=len(records),
+                        action='Separación lógica de objetos JSON completos concatenados; original intacto',
+                    )
+                )
             for record in records:
                 stats['records'] += 1
                 stats['missing_ocid'] += not record.get('ocid')
@@ -95,13 +114,22 @@ def run():
         print(f'Validando {path.name}', flush=True)
         stats, repairs, years, min_date, max_date = scan(path, schema)
         save_json(f'metadata/repairs_{path.name}.json', repairs)
-        manifest.append(dict(
-            file=path.name, bytes=path.stat().st_size, sha256=file_sha256(path),
-            records=stats['records'], lines=stats['lines'], min_effective_date=min_date, max_effective_date=max_date,
-            recovered_concatenated_lines=stats['recovered_concatenated_lines'],
-            invalid_json=stats['invalid_json'], missing_ocid=stats['missing_ocid'],
-            validated_at=now(), **provenance(path, downloads),
-        ))
+        manifest.append(
+            dict(
+                file=path.name,
+                bytes=path.stat().st_size,
+                sha256=file_sha256(path),
+                records=stats['records'],
+                lines=stats['lines'],
+                min_effective_date=min_date,
+                max_effective_date=max_date,
+                recovered_concatenated_lines=stats['recovered_concatenated_lines'],
+                invalid_json=stats['invalid_json'],
+                missing_ocid=stats['missing_ocid'],
+                validated_at=now(),
+                **provenance(path, downloads),
+            )
+        )
         coverage.extend(dict(file=path.name, effective_year=y, count=n) for y, n in years.items())
     save_json('metadata/source_manifest.json', manifest)
     save_json('metadata/schema.json', {k: sorted(v) for k, v in schema.items()})
