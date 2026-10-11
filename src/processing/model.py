@@ -1,13 +1,34 @@
-import json
+"""Aplanado de un documento OCDS en filas de las tablas analíticas.
+
+Motor: funciones Python puras. Spark las ejecuta en paralelo dentro de
+`build_processes.parse` (una llamada por documento), así que aquí no hay Spark.
+
+Un registro OCDS anida convocatoria, ítems, adjudicaciones con proveedores y
+contratos. `flatten` produce una fila de `processes` y las filas hijas de `items`,
+`awards`, `suppliers` y `contracts`, todas con las columnas BASE del proceso.
+
+Reglas de negocio documentadas en el README:
+- Fecha de convocatoria: tender.datePublished; si falta, tender.tenderPeriod.startDate.
+- Montos: amount_PEN de la fuente; PEN nativo; o tasa implícita de la convocatoria si
+  la adjudicación está en la misma moneda. Lo demás queda nulo (nunca cero) y se
+  completa después en Spark con tasas históricas.
+- El monto de una adjudicación con varios proveedores se reparte en partes iguales.
+"""
 import math
 from datetime import datetime
+
 from src.processing.entity_level import buyer_level
 from src.processing.normalize_text import normalize_text
 
+EXTREME_AMOUNT = 1_000_000_000
+
 
 def effective_date(record):
+    """Fecha de convocatoria (ISO) y el campo del que se tomó."""
     tender = record.get('tender') or {}
-    for source, value in [('tender.datePublished', tender.get('datePublished')), ('tender.tenderPeriod.startDate', (tender.get('tenderPeriod') or {}).get('startDate'))]:
+    candidates = [('tender.datePublished', tender.get('datePublished')),
+                  ('tender.tenderPeriod.startDate', (tender.get('tenderPeriod') or {}).get('startDate'))]
+    for source, value in candidates:
         if value:
             try:
                 return datetime.fromisoformat(value.replace('Z', '+00:00')).date().isoformat(), source
@@ -34,16 +55,20 @@ def number(value):
 
 
 def amount_pen(value):
+    """Monto en soles si la fuente lo publica (amount_PEN) o si ya está en PEN."""
     value = value or {}
     converted = number(value.get('amount_PEN'))
-    return converted if converted is not None else number(value.get('amount')) if value.get('currency') == 'PEN' else None
+    if converted is not None:
+        return converted
+    return number(value.get('amount')) if value.get('currency') == 'PEN' else None
 
 
 def converted_amount(value, implied_currency=None, implied_rate=None):
-    """Return PEN value plus auditable conversion metadata.
+    """Monto en PEN con el método y la tasa usados, para que la conversión sea auditable.
 
-    The source-provided amount_PEN always wins. Foreign awards may reuse the
-    tender's own PEN/original ratio when both objects use the same currency.
+    El amount_PEN de la fuente siempre gana. Una adjudicación en moneda extranjera
+    puede reutilizar la tasa PEN/original de su propia convocatoria si ambas usan la
+    misma moneda.
     """
     value = value or {}
     original = number(value.get('amount'))
@@ -60,70 +85,137 @@ def converted_amount(value, implied_currency=None, implied_rate=None):
 
 
 def amount_band(value):
+    """Rangos de monto convocado en PEN: bajo < 100 mil <= medio < 1 M <= alto < 10 M <= muy alto."""
     if value is None or value < 0:
         return 'sin dato'
-    return 'bajo' if value < 100000 else 'medio' if value < 1000000 else 'alto' if value < 10000000 else 'muy alto'
+    if value < 100_000:
+        return 'bajo'
+    if value < 1_000_000:
+        return 'medio'
+    return 'alto' if value < 10_000_000 else 'muy alto'
+
+
+def competition_level(bidders):
+    if bidders is None or bidders < 1:
+        return 'sin dato'
+    if bidders == 1:
+        return 'uno'
+    return 'dos a tres' if bidders <= 3 else 'cuatro o mas'
+
+
+def requirement_text(tender, items):
+    """Descripción del requerimiento y de sus ítems (incluida su clasificación UNSPSC).
+
+    El título OCDS del OECE es la nomenclatura del proceso (AS-SM-12-2024-MDCH/CS-1), no
+    su objeto: se guarda como tender_code y se excluye del texto usado para similitud.
+    """
+    parts = ([tender.get('description') or '']
+             + [i.get('description') or '' for i in items]
+             + [(i.get('classification') or {}).get('description') or '' for i in items])
+    return ' '.join(str(x) for x in parts)
+
+
+def buyer_department(record, buyer):
+    """Departamento del domicilio del comprador (no necesariamente del lugar de ejecución)."""
+    address = next(((p.get('address') or {}) for p in record.get('parties', []) if p.get('id') == buyer.get('id')), {})
+    return normalize_text(address.get('department') or address.get('region')).upper() or None
+
+
+def item_rows(base, items, date):
+    rows = []
+    for idx, item in enumerate(items):
+        value = item.get('totalValue') or {}
+        amount, method, rate = converted_amount(value)
+        rows.append(dict(
+            base, item_id=str(item.get('id', idx)), description=item.get('description'),
+            classification=(item.get('classification') or {}).get('id'), quantity=number(item.get('quantity')),
+            amount_original=number(value.get('amount')), amount_pen=amount, currency=value.get('currency'),
+            conversion_method=method, exchange_rate=rate, conversion_reference_date=date))
+    return rows
+
+
+def award_and_supplier_rows(base, awards, converted_awards, buyer_id, date):
+    award_rows, supplier_rows = [], []
+    for idx, (award, (amount, method, rate)) in enumerate(zip(awards, converted_awards)):
+        award_id = str(award.get('id', idx))
+        # Un proveedor repetido dentro de la misma adjudicación se cuenta una vez.
+        suppliers = {s.get('id') or s.get('name'): s for s in award.get('suppliers', [])}
+        value = award.get('value') or {}
+        amount = amount if amount is None or amount >= 0 else None
+        award_date = iso_date(award.get('date')) or date
+        award_rows.append(dict(
+            base, award_id=award_id, amount_original=number(value.get('amount')), amount_pen=amount,
+            currency=value.get('currency'), conversion_method=method, exchange_rate=rate,
+            conversion_reference_date=award_date, supplier_count=len(suppliers)))
+        for supplier_id, supplier in suppliers.items():
+            supplier_rows.append(dict(
+                base, award_id=award_id, supplier_id=supplier_id, supplier_name=supplier.get('name'), buyer_id=buyer_id,
+                allocated_amount_pen=amount / len(suppliers) if amount is not None else None,
+                currency=value.get('currency'), conversion_method=method, exchange_rate=rate,
+                conversion_reference_date=award_date))
+    return award_rows, supplier_rows
+
+
+def contract_rows(base, contracts, date):
+    rows = []
+    for idx, contract in enumerate(contracts):
+        value = contract.get('value') or {}
+        amount, method, rate = converted_amount(value)
+        reference_date = (iso_date(contract.get('dateSigned'))
+                          or iso_date((contract.get('period') or {}).get('startDate')) or date)
+        rows.append(dict(
+            base, contract_id=str(contract.get('id', idx)), award_id=contract.get('awardID'),
+            amount_original=number(value.get('amount')), amount_pen=amount, currency=value.get('currency'),
+            conversion_method=method, exchange_rate=rate, conversion_reference_date=reference_date,
+            status=contract.get('status')))
+    return rows
 
 
 def flatten(record, source):
-    t = record.get('tender') or {}
+    """Filas de las cinco tablas para un documento OCDS."""
+    tender = record.get('tender') or {}
     date, date_source = effective_date(record)
-    buyer = record.get('buyer') or t.get('procuringEntity') or {}
-    address = next(((p.get('address') or {}) for p in record.get('parties', []) if p.get('id') == buyer.get('id')), {})
-    department = normalize_text(address.get('department') or address.get('region')).upper() or None
-    items = t.get('items') or []
+    buyer = record.get('buyer') or tender.get('procuringEntity') or {}
+    items = tender.get('items') or []
     awards = record.get('awards') or []
-    # El título OCDS del OECE es la nomenclatura del proceso (AS-SM-12-2024-MDCH/CS-1), no su
-    # objeto: se guarda como tender_code y se excluye del texto usado para similitud.
-    text = ' '.join(str(x) for x in [t.get('description') or '']
-                    + [i.get('description') or '' for i in items]
-                    + [(i.get('classification') or {}).get('description') or '' for i in items])
-    tender_value = t.get('value') or {}
+    text = requirement_text(tender, items)
+
+    tender_value = tender.get('value') or {}
     amount, tender_conversion_method, tender_exchange_rate = converted_amount(tender_value)
     tender_original = number(tender_value.get('amount'))
     tender_currency = tender_value.get('currency')
     implied_rate = tender_exchange_rate if amount is not None and tender_original not in (None, 0) else None
     converted_awards = [converted_amount(a.get('value'), tender_currency, implied_rate) for a in awards]
-    amounts = [converted[0] for converted in converted_awards]
-    valid = [a for a in amounts if a is not None and a >= 0]
-    bidders = number(t.get('numberOfTenderers'))
-    competition = 'sin dato' if bidders is None or bidders < 1 else 'uno' if bidders == 1 else 'dos a tres' if bidders <= 3 else 'cuatro o mas'
-    base = dict(ocid=record.get('ocid'), source_file=source, release_date=record.get('date') or '', effective_date=date, date_source=date_source, year=int(date[:4]) if date else None, month=int(date[5:7]) if date else None)
-    p = dict(
+    award_amounts = [converted[0] for converted in converted_awards]
+    valid_awards = [a for a in award_amounts if a is not None and a >= 0]
+    bidders = number(tender.get('numberOfTenderers'))
+
+    base = dict(ocid=record.get('ocid'), source_file=source, release_date=record.get('date') or '',
+                effective_date=date, date_source=date_source,
+                year=int(date[:4]) if date else None, month=int(date[5:7]) if date else None)
+    process = dict(
         base,
         buyer_id=buyer.get('id'), buyer_name=buyer.get('name'), buyer_level=buyer_level(buyer.get('name')),
-        department=department, category=t.get('mainProcurementCategory'), method=t.get('procurementMethod'),
-        method_details=t.get('procurementMethodDetails'), tender_code=t.get('title'),
+        department=buyer_department(record, buyer), category=tender.get('mainProcurementCategory'),
+        method=tender.get('procurementMethod'), method_details=tender.get('procurementMethodDetails'),
+        tender_code=tender.get('title'),
         tender_amount_pen=amount if amount is None or amount >= 0 else None, tender_amount_original=tender_original,
         currency=tender_currency, tender_conversion_method=tender_conversion_method,
         tender_exchange_rate=tender_exchange_rate, negative_amount=amount is not None and amount < 0,
-        extreme_amount=amount is not None and amount > 1000000000,
-        award_amount_pen=sum(valid) if valid else None,
+        extreme_amount=amount is not None and amount > EXTREME_AMOUNT,
+        award_amount_pen=sum(valid_awards) if valid_awards else None,
         award_converted_count=sum(method == 'tender_implied_rate' for _, method, _ in converted_awards),
-        award_unconverted_count=sum(a is None for a in amounts),
-        bidders=bidders, competition=competition, amount_band=amount_band(amount),
+        award_unconverted_count=sum(a is None for a in award_amounts),
+        bidders=bidders, competition=competition_level(bidders), amount_band=amount_band(amount),
         text=text, normalized_text=normalize_text(text),
         item_count=len(items), award_count=len(awards),
         supplier_count=len({s.get('id') for a in awards for s in a.get('suppliers', []) if s.get('id')}),
     )
-    tables = {'processes': [p], 'items': [], 'awards': [], 'suppliers': [], 'contracts': []}
-    for idx, i in enumerate(items):
-        item_value = i.get('totalValue') or {}
-        item_amount, item_method, item_rate = converted_amount(item_value)
-        tables['items'].append(dict(base, item_id=str(i.get('id', idx)), description=i.get('description'), classification=(i.get('classification') or {}).get('id'), quantity=number(i.get('quantity')), amount_original=number(item_value.get('amount')), amount_pen=item_amount, currency=item_value.get('currency'), conversion_method=item_method, exchange_rate=item_rate, conversion_reference_date=date))
-    for idx, (a, converted) in enumerate(zip(awards, converted_awards)):
-        aid = str(a.get('id', idx))
-        suppliers = {s.get('id') or s.get('name'): s for s in a.get('suppliers', [])}
-        award_value = a.get('value') or {}
-        av, conversion_method, exchange_rate = converted
-        av = av if av is None or av >= 0 else None
-        award_date = iso_date(a.get('date')) or date
-        tables['awards'].append(dict(base, award_id=aid, amount_original=number(award_value.get('amount')), amount_pen=av, currency=award_value.get('currency'), conversion_method=conversion_method, exchange_rate=exchange_rate, conversion_reference_date=award_date, supplier_count=len(suppliers)))
-        for sid, s in suppliers.items():
-            tables['suppliers'].append(dict(base, award_id=aid, supplier_id=sid, supplier_name=s.get('name'), buyer_id=buyer.get('id'), allocated_amount_pen=av / len(suppliers) if av is not None else None, currency=award_value.get('currency'), conversion_method=conversion_method, exchange_rate=exchange_rate, conversion_reference_date=award_date))
-    for idx, c in enumerate(record.get('contracts') or []):
-        contract_value = c.get('value') or {}
-        contract_amount, contract_method, contract_rate = converted_amount(contract_value)
-        reference_date = iso_date(c.get('dateSigned')) or iso_date((c.get('period') or {}).get('startDate')) or date
-        tables['contracts'].append(dict(base, contract_id=str(c.get('id', idx)), award_id=c.get('awardID'), amount_original=number(contract_value.get('amount')), amount_pen=contract_amount, currency=contract_value.get('currency'), conversion_method=contract_method, exchange_rate=contract_rate, conversion_reference_date=reference_date, status=c.get('status')))
-    return tables
+    award_rows, supplier_rows = award_and_supplier_rows(base, awards, converted_awards, buyer.get('id'), date)
+    return {
+        'processes': [process],
+        'items': item_rows(base, items, date),
+        'awards': award_rows,
+        'suppliers': supplier_rows,
+        'contracts': contract_rows(base, record.get('contracts') or [], date),
+    }
