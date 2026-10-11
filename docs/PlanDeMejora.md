@@ -60,7 +60,9 @@ Fase 0 Cimientos ─► Fase 1 Capa de datos ─► Fases 2–6 Partes I–V ─
 | [x] 0.2 | — | `scripts/make_dev_sample.py` toma N líneas por año y las deja en `data/raw_dev/`. La variable `RAW_PATH` permite elegir completo o muestra. | `run_all` termina sobre la muestra en menos de 10 min |
 | [x] 0.3 | B-01, B-02, B-03, VI-07 | Corregir la carga infinita en Ann y Similarity cuando la API falla. Quitar "198 mil" y los años escritos en el código: un endpoint `/api/meta` entrega años y totales. | Con la API caída, la página muestra el error. No quedan cifras ni años fijos en `frontend/src` |
 | [x] 0.4 | B-04, V-05 | `test_api.py` valida invariantes (rangos, no vacío, `found >= 8` o estado `insufficient_evidence`) en lugar de cantidades exactas. | `make test` pasa con artefactos de la muestra |
-| [ ] 0.5 | — | Corrida base completa con el código actual, guardando una copia de `artifacts/` como referencia para comparar después. | `run_manifest.status == complete` |
+| [x] 0.5 | — | Corrida base completa con el código actual, guardando una copia de `artifacts/` como referencia para comparar después. | `run_manifest.status == complete` |
+
+**Línea base (0.5, código original, datos completos):** 279 105 registros → 196 277 procesos 2023–2025; ítems 230 496, adjudicaciones 164 712, proveedores 161 255, contratos 159 703; 8 reglas; todos los controles en verde. Tiempos: validation 98 s · processing 908 s · part1 149 s · part2 58 s · part3 91 s · part4 92 s · part5 101 s · export 12 s (≈ 25 min). `artifacts/` pesa 362 MB. Copia en `data/baseline/` (no versionada) para comparar.
 
 ### Fase 1: Capa de datos (`src/processing`)
 
