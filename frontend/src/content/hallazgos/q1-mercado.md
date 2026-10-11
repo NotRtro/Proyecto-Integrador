@@ -1,5 +1,7 @@
-PENDIENTE: borrar esta línea al redactar la interpretación.
+**A escala nacional no hay concentración.** Cada año ganan adjudicaciones entre 27 mil y 32 mil proveedores, y el HHI de proveedores queda entre 14 y 33, muy lejos del umbral de concentración moderada (1 500). Los diez proveedores más grandes no llegan al 14 % del monto. Del lado de los compradores ocurre lo mismo: el HHI de entidades está entre 101 y 166, aunque Provías Nacional sola llegó a adjudicar el 9 % del monto de 2023.
 
-Preguntas guía: ¿Por qué el HHI nacional es bajo? ¿Por qué cambia al excluir consorcios? ¿Es útil medir concentración a nivel nacional?
+**Por qué el HHI sube de 14 a 33 entre 2023 y 2025.** No es que el mercado se esté cerrando: lo mueven unas pocas megaobras. En 2025, J Y S Servicios Generales ganó una sola obra de S/ 1 112 millones con la Autoridad Nacional de Infraestructura, CONSORCIO SAN JUAN la del Hospital Regional de Loreto (S/ 990 millones) y CONSORCIO HUASCARAN otra de S/ 685 millones con la misma ANI. Con menos monto total en 2025, tres contratos bastan para mover el índice.
 
-Usar las cifras de la sección, el contexto peruano y sus límites (señal, no prueba).
+**Por qué cambia al excluir los consorcios.** Los consorcios reciben la mitad del monto y cada uno tiene un identificador de un solo uso, así que actúan como miles de proveedores pequeños que diluyen el índice. Al quitarlos, el monto restante se reparte entre menos actores y el HHI sube (en 2025, de 33 a 65, porque J Y S pasa a tener el 6,2 % del monto sin consorcios). Ninguna de las dos cifras es "la verdadera": con estos datos no se puede saber qué empresas hay detrás de cada consorcio.
+
+**¿Sirve medir concentración a nivel nacional?** Casi nada. Una constructora de carreteras no compite con un proveedor de raciones ni con una empresa de vigilancia en Tumbes. El mercado relevante para la competencia es un producto en un territorio, y para la dependencia, cada entidad con sus proveedores. Por eso la Q1 baja al nivel de entidad y de departamento: el HHI nacional sirve solo para descartar que exista un "gran proveedor del Estado".

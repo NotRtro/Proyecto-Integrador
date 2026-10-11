@@ -1,5 +1,9 @@
-PENDIENTE: borrar esta línea al redactar la interpretación.
+**Cuánto trabajo evita LSH.** Comparar cada proceso con todos los demás exige 19 262 millones de pares: con un Jaccard por microsegundo serían más de cinco horas solo de cómputo, sin contar armar los conjuntos. LSH propone 198 160 candidatos, el 0,001 % de los pares (unas 97 mil veces menos), y todo el proceso tarda unos 44 s en el clúster: 19 s de firmas MinHash, 13 s armando buckets, 5 s generando candidatos y 7 s verificando cada candidato con el Jaccard exacto.
 
-Preguntas guía: ¿Cuánto trabajo evitó LSH? ¿Qué se pierde (recall) y qué se descarta (buckets de plantillas)?
+**Qué se obtiene.** 130 168 pares con Jaccard ≥ 0,7 en 196 277 procesos. El 66 % de los candidatos resulta verdaderamente similar; el resto se descarta en la verificación, así que el resultado final no tiene falsos positivos. Lo que sí puede perderse son pares similares que no coincidieron en ninguna banda. En la muestra de evaluación esa pérdida fue del 6 %, concentrada en pares con Jaccard apenas sobre 0,7.
 
-Usar las cifras de la sección, el contexto peruano y sus límites (señal, no prueba).
+**Lo que se descarta a propósito: las plantillas.** Algunos textos son idénticos en cientos de procesos. Un bucket con n procesos genera n(n−1)/2 pares: el más grande, con 550 procesos, aportaría 150 mil pares por sí solo, más que todo el resto del corpus. Por eso los 36 buckets de más de 200 procesos no se expanden en pares y se reportan como grupos: 7 textos que suman 2 304 procesos. Todos son del **OEFA** ("Tercero supervisor titulado – ingeniería ambiental", "Servicio de supervisión ambiental", "Tercero fiscalizador – derecho"). No es un error del algoritmo: el OEFA contrata como proveedores, uno por proceso, a cientos de profesionales que hacen supervisión y fiscalización ambiental en campo, y cada contratación usa la misma descripción. Es un hallazgo en sí mismo, que la Q3 retoma.
+
+**Por qué Spark aquí sí.** Las firmas se calculan por partición con numpy (`mapPartitions`), los buckets son un `groupBy` por banda, y los candidatos, un self-join dentro de cada bucket. Todo eso se distribuye de forma natural, y la memoria por tarea se mantiene acotada aunque el corpus crezca. Es la etapa del proyecto donde Spark más claramente hace algo que sería incómodo en una sola máquina.
+
+**Límite.** El umbral de 0,7 sobre shingles de dos palabras detecta textos casi idénticos, no compras equivalentes con otra redacción. Para eso está el buscador de vecinos (Parte III).

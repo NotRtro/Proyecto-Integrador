@@ -1,5 +1,12 @@
-PENDIENTE: borrar esta línea al redactar la interpretación.
+**Configuración elegida: 16 bandas × 8 filas (k = 128).** El umbral efectivo de esa combinación es (1/16)^(1/8) ≈ 0,71, prácticamente el umbral de "casi idéntico" de la Q3 (Jaccard ≥ 0,7). En la muestra de evaluación (1 500 procesos de 36 entidades, 1,1 millones de pares, 538 pares verdaderamente similares) logra el mejor F1 de toda la rejilla: precisión 86 %, recall 94 %, F1 0,90, con solo 588 candidatos a verificar.
 
-Preguntas guía: ¿Qué combinación de bandas y filas eligieron para el corpus y por qué? Explicar falsos positivos y falsos negativos con ejemplos de pares.
+**El compromiso que controlan b y r.** Con más filas por banda (r alto) es difícil que dos firmas coincidan en una banda entera: menos candidatos, más precisión y menos recall. Con k = 32, 4 × 8 da precisión 96 % y recall 77 %. Con más bandas (b alto) hay más oportunidades de coincidir: 8 × 4 recupera el 97 % pero con precisión de 45 % (1 173 candidatos, 649 falsos). La curva S del laboratorio lo muestra en vivo: r mueve el punto de quiebre y b lo hace más empinado.
 
-Usar las cifras de la sección, el contexto peruano y sus límites (señal, no prueba).
+**Cómo son los errores.** No son aleatorios, se acumulan alrededor del umbral:
+
+- **Falsos positivos (80):** pares con Jaccard entre 0,33 y 0,69, mediana 0,63. Un ejemplo típico: "Consultoría para el fortalecimiento de capacidades... de los recicladores beneficiarios de la ciudad de **Tumbes**" frente a la misma consultoría para **Paita** (J = 0,63). Son el mismo tipo de servicio con otro lugar, parecidos pero no idénticos. Su costo es solo computacional, porque cada candidato se verifica con el Jaccard exacto y se descarta.
+- **Falsos negativos (30):** pares con Jaccard entre 0,70 y 0,78, justo encima del umbral. Por ejemplo, "Servicio de atención de vales para alimentos... Gerencia Regional de Salud Cusco" frente a "**Contratación de** servicio de atención de vales..." (J = 0,73): las palabras añadidas cambian los primeros shingles y los pares se escapan de todas las bandas. Este error sí se pierde, porque LSH nunca los propone.
+
+**De la muestra al corpus.** En el corpus completo la precisión de los candidatos es menor: el 66 % de los 198 160 candidatos supera J ≥ 0,7, frente al 86 % de la muestra. La diferencia viene del diseño de la muestra: se eligieron entidades completas para tener suficientes pares similares, y eso la enriquece en positivos. La precisión depende de cuántos pares similares hay y no se traslada de la muestra al corpus. El recall sí es una propiedad de la curva S y se espera parecido (≈ 94 %), aunque en el corpus no se puede medir sin calcular los 19 mil millones de pares.
+
+**Límite.** Los buckets con más de 200 procesos (textos-plantilla) no se expanden en pares, así que sus repeticiones se reportan como grupos y no como pares.

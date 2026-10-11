@@ -1,5 +1,12 @@
-PENDIENTE: borrar esta línea al redactar la interpretación.
+**Para qué sirve en la práctica.** Dado un proceso, el buscador devuelve los 10 más parecidos en todo el corpus en menos de un milisegundo. Esto sirve a dos usuarios:
 
-Preguntas guía: ¿Los vecinos encontrados tienen sentido para un comprador o un auditor? ¿Cuándo usar HNSW o IVF?
+- **Un comprador público** que está armando un requerimiento puede ver cómo lo describieron otras entidades, qué valor estimaron y cómo les fue (cuántos participantes, a qué precio se adjudicó). Es una forma barata de estandarizar especificaciones y estimar mejor el valor referencial.
+- **Un auditor** puede partir de un proceso sospechoso y encontrar sus "hermanos": el mismo requerimiento en otras entidades o en otros años, para comparar precios unitarios y proveedores.
 
-Usar las cifras de la sección, el contexto peruano y sus límites (señal, no prueba).
+**¿Los vecinos tienen sentido?** Sí, y a veces mejor que el Jaccard. La consulta "Adquisición de césped artificial 60 mm" encuentra como segundo vecino "Contratación de **grass sintético**" (coseno 0,91): no comparten casi ninguna palabra clave, pero la SVD aprendió que "césped artificial" y "grass sintético" aparecen en los mismos contextos (obras de losas deportivas). Con shingles, ese par tendría Jaccard bajo. La consulta por "calamina galvanizada 0,80 × 3,60 m" devuelve otras compras de calamina con medidas casi iguales y, más abajo, acero corrugado para la misma obra de cobertizos: el insumo y su contexto. La prueba más directa es el cruce con la Parte II: de 300 pares casi idénticos según Jaccard, el 94 % tiene una similitud coseno que los pondría entre los 10 vecinos del otro. Solo el 49 % aparece literalmente en la lista, porque esos textos tienen decenas de gemelos con la misma similitud y la lista de 10 se llena con cualquiera de ellos. Las dos representaciones (shingles con Jaccard y TF-IDF con coseno) cuentan la misma historia por caminos distintos.
+
+**Por qué TF-IDF y no los shingles de la Parte II.** Para encontrar casi duplicados basta el solapamiento exacto de pares de palabras. Para encontrar procesos *parecidos* importa más el peso de las palabras raras: "hemoglobinómetro" dice mucho más que "adquisición". TF-IDF pondera eso y SVD comprime 50 000 términos a 256 dimensiones, donde la distancia coseno funciona bien y los índices ANN son eficientes. La SVD conserva solo el 25 % de la varianza, pero suficiente para ordenar vecinos.
+
+**¿HNSW o IVF para este buscador?** HNSW: el corpus cabe en memoria, el índice se construye una vez por corrida (unos 25 s) y lo que importa es responder rápido y con buen recall a cada consulta. IVF tendría sentido si el corpus creciera cada día y hubiera que reconstruir el índice seguido.
+
+**Límite.** La similitud es textual. Dos procesos con la misma descripción pueden comprar cantidades o calidades muy distintas, y el buscador no ve precios unitarios. Sirve para encontrar qué comparar, no para concluir.

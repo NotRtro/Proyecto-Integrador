@@ -1,5 +1,9 @@
-PENDIENTE: borrar esta línea al redactar la interpretación.
+**La media engaña.** En obras de 2024 el monto medio por proceso es S/ 8,6 millones, pero la mediana es S/ 1,35 millones: la mitad de las obras cuesta menos que eso. El percentil 99 llega a S/ 183 millones. Unos pocos proyectos enormes arrastran el promedio hacia arriba, y el histograma en escala logarítmica lo muestra: la distribución se parece a una campana solo cuando se mira el logaritmo del monto. Por eso el EDA usa percentiles y no promedios.
 
-Preguntas guía: ¿Por qué la media engaña con estos montos? ¿Cuántos procesos concentran la mayor parte del valor? ¿Cómo cambian los totales sin montos extremos?
+**Pocos procesos concentran casi todo el valor.** Los procesos de más de S/ 10 millones (banda "muy alto") son el 1,5–1,7 % del total y suman entre el 58 % y el 66 % del monto convocado de cada año. En el otro extremo, los procesos de menos de S/ 100 mil son casi el 40 % y no llegan al 2 % del monto.
 
-Usar las cifras de la sección, el contexto peruano y sus límites (señal, no prueba).
+Esto tiene una consecuencia práctica para el control: revisar el 2 % de procesos más grandes cubre más de la mitad del dinero. En cambio, el riesgo de baja competencia de la Q2 se concentra en los procesos pequeños (20 % de postor único en la banda baja frente a 9 % en la media), donde hay muchos procesos y poco monto en cada uno.
+
+**Montos extremos: el hallazgo fue un problema de registro.** Cinco registros superan los S/ 1 000 millones. Al revisarlos, los cuatro de 2024 son **el mismo proceso**: la licitación del Hospital Regional de Loreto (LP-SM-8-2024), publicada con cuatro `ocid` distintos, dos con S/ 1 003 millones y dos con S/ 1 058 millones, probablemente versiones antes y después de actualizar el valor estimado. Juntos suman S/ 4,1 mil millones, el 4,5 % del monto convocado de 2024: unos S/ 3 mil millones de ese año son copias. El quinto es una obra real de S/ 1 135 millones de la Autoridad Nacional de Infraestructura en 2025. Los extremos no se eliminan, pero se marcan y las comparaciones entre años se hacen con y sin ellos. Este caso, que la Q3 también encontró por similitud de texto, muestra por qué deduplicar solo por `ocid` no basta.
+
+**Límite.** El monto convocado es el valor estimado por la entidad, no lo que finalmente se pagó. El monto adjudicado suele ser menor (las ofertas compiten a la baja) y falta en los procesos sin buena pro.

@@ -1,5 +1,13 @@
-PENDIENTE: borrar esta línea al redactar la interpretación.
+**Cómo se arma la canasta.** Cada proceso es una canasta de seis ítems, uno por atributo: categoría, modalidad, departamento, banda de monto, postores y nivel de gobierno. El año queda fuera porque es el momento, no una característica del proceso, y generaba reglas cronológicas obvias. Las reglas se recalculan por año para ver si se sostienen.
 
-Preguntas guía: ¿Qué reglas son normativas y cuáles informativas? ¿Por qué Apriori y FP-Growth coinciden y cuál escala mejor?
+**Apriori y FP-Growth encuentran exactamente lo mismo.** Sobre la misma muestra de 10 000 canastas, ambos producen 494 conjuntos frecuentes con soporte del 2 %, 185 con 5 % y 73 con 10 %, idénticos ítem por ítem (si no, la corrida falla). En la muestra Apriori es igual de rápido o más (2,1 s frente a 2,2 s), porque con canastas de 6 ítems hay pocos candidatos y FP-Growth paga el costo fijo de lanzar un trabajo de Spark. FP-Growth escala mejor: no genera candidatos ni recorre las canastas en cada nivel, sino que las comprime en un árbol de prefijos. Sobre las 196 277 canastas completas tarda 4 s. Apriori necesitaría una pasada completa por cada tamaño de conjunto.
 
-Usar las cifras de la sección, el contexto peruano y sus límites (señal, no prueba).
+**Normativas frente a informativas: el filtro más importante.** De las 658 reglas con soporte ≥ 2 % y confianza ≥ 50 %, 225 son **normativas**: redescubren la ley. La modalidad la fija el objeto y el valor estimado, así que "monto bajo → Comparación de Precios" o "obra de monto muy alto → Licitación Pública" tienen lift alto pero no enseñan nada; son la Ley de Contrataciones vista desde los datos. Otras 17 incluyen "sin dato" y describen el registro, no la compra. Quedan 416 informativas.
+
+**Improvement: que la regla diga algo que una más simple no dice.** Muchas reglas largas solo repiten una corta: "Comparación de Precios ∧ local → 2–3 postores" (90 %) no aporta sobre "Comparación de Precios → 2–3 postores" (88 %). Por eso se exige que la confianza supere en al menos 5 puntos a la de cualquier sub-regla (incluida la tasa base). Solo 98 de las 416 informativas lo cumplen. Las 5 reglas generales seleccionadas tienen improvement de 13 a 74 puntos.
+
+**Qué dicen las reglas generales.** Describen cómo compra el Estado peruano: las municipalidades gastan sus montos grandes en obras (75 %); los gobiernos regionales recurren a la Comparación de Precios para compras pequeñas; los regímenes especiales tienen un solo participante (73 %) y se convocan desde entidades nacionales en Lima (98 %); y el campo de "postores" cuenta cotizaciones en la Comparación de Precios (89 % con dos o tres) y participantes inscritos en las demás modalidades. Esta última regla es metodológicamente la más valiosa: cambia cómo se interpreta toda la Q2.
+
+**Los umbrales del laboratorio** filtran las reglas ya calculadas: no se vuelve a minar. Subir el lift mínimo deja las asociaciones más fuertes, que suelen ser normativas. Por eso el filtro por tipo viene en "informativa" por defecto.
+
+**Límite.** Las asociaciones no son causales y heredan los sesgos del registro: el departamento es la sede del comprador y "postores" mide cosas distintas según la modalidad.

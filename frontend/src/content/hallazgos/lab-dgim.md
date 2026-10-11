@@ -1,5 +1,9 @@
-PENDIENTE: borrar esta línea al redactar la interpretación.
+**La cota del 50 % se cumple siempre, y con mucho margen.** En las ocho configuraciones (dos señales × cuatro ventanas), el error relativo al final del flujo va de 4 % a 30 %. Por ejemplo, en los últimos 1 000 eventos hubo 301 adjudicaciones de procesos con un solo postor y DGIM estimó 315 (5 %). En los últimos 10 000 hubo 1 409 y estimó 1 611 (14 %). La cota teórica de DGIM es del 50 % porque solo el bucket más antiguo se cuenta a medias. En la práctica ese bucket suele ser pequeño frente al total y el error queda muy por debajo.
 
-Preguntas guía: ¿Se cumple la cota del 50 %? ¿Ventanas en eventos o en días para este caso de uso?
+**Memoria logarítmica.** Para una ventana de 10 000 eventos, el conteo exacto guarda 10 000 bits con sus marcas de tiempo (160 KB en esta implementación), y DGIM guarda 15 buckets (240 bytes). La relación crece con la ventana: duplicar la ventana agrega aproximadamente un bucket más.
 
-Usar las cifras de la sección, el contexto peruano y sus límites (señal, no prueba).
+**¿Ventanas de eventos o de días?** Para supervisar, conviene la ventana en **días**: "¿cuántos procesos de un solo postor hubo en los últimos 30 días?" se compara con meses anteriores y no depende de si hubo muchas o pocas adjudicaciones. La ventana de eventos tiene un significado variable: los últimos 10 000 eventos son unas pocas semanas en noviembre y varios meses en enero. El proyecto implementa ambas: la de días usa la fecha como marca de tiempo y puede recibir varios eventos con la misma fecha.
+
+**El error mayor (30 %)** aparece en la señal de alto monto con ventana de 30 días: hubo 190 procesos de más de S/ 1 millón y DGIM estimó 247. Con pocos eventos positivos, un bucket grande que cae a medias en el borde de la ventana pesa mucho.
+
+**Qué configuración usaríamos.** DGIM con su forma clásica (hasta dos buckets por tamaño) basta para una alarma de tendencia ("este mes se duplicaron los procesos de un solo postor"). Si hiciera falta más precisión, se admiten más buckets por tamaño: el error baja a 1/r a cambio de memoria proporcional, que sigue siendo logarítmica.

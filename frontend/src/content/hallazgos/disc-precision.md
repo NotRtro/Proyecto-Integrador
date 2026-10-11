@@ -1,5 +1,13 @@
-PENDIENTE: borrar esta línea al redactar la interpretación.
+**Vale la pena cuando la versión exacta es cuadrática o el dato no termina. No vale cuando todo cabe en memoria.** Técnica por técnica, con las mediciones de la tabla:
 
-Preguntas guía: ¿Vale la pena la pérdida de precisión de cada método aproximado en este caso de uso?
+- **MinHash (k = 128): sí.** Pierde ±0,04 en la estimación del Jaccard de pares similares, un error que no cambia la decisión de si un par es "casi idéntico" (umbral 0,7). Gana una firma de tamaño fijo por proceso, que es lo que hace posible LSH.
+- **LSH (16 × 8): sí, y es indispensable.** Revisa 198 mil candidatos en lugar de 19 262 millones de pares, unas 100 mil veces menos trabajo. Pierde cerca del 6 % de los pares similares (recall 94 % en la muestra), casi todos con Jaccard apenas por encima de 0,7. Para la Q3 eso no cambia la respuesta: las entidades que repiten requerimientos tienen decenas o miles de pares, y perder algunos no las borra del ranking. Sin LSH, la Q3 no se podría responder en una laptop.
+- **HNSW: sí, para un buscador.** Pierde entre 3 y 5 % de los vecinos exactos (y muchos de esos son empates entre textos idénticos) a cambio de responder más de 100 veces más rápido. Para una consulta aislada, 21 ms de la búsqueda exacta también son aceptables; HNSW se justifica cuando hay muchas consultas o el corpus crece.
+- **IVF: depende.** Con nprobe = 16 iguala el recall de HNSW (97 %) pero es 7 veces más lento por consulta. Su ventaja es construir rápido si se elige un nlist bajo.
+- **Bloom Filter: en este volumen, no hacía falta.** Con 256 KB el error es despreciable (0,1–0,3 %), pero el conjunto exacto ocupa solo 13,6 MB. La pérdida es pequeña, y la ganancia también.
+- **Count-Min Sketch: solo para los frecuentes.** Error de 4–7 % en los proveedores y productos más frecuentes, y de miles por ciento en la cola. Para la Q1, donde importa auditar a proveedores concretos, un diccionario exacto (8,5 MB) es mejor.
+- **DGIM: sí, para alertas.** Error del 5–15 % en ventanas de eventos, con 240 bytes en vez de 160 KB. Para detectar que la proporción de postores únicos se duplicó, un 15 % de error es tolerable. Para reportar una cifra oficial, no.
 
-Usar las cifras de la sección, el contexto peruano y sus límites (señal, no prueba).
+**Patrón general.** Los métodos aproximados que se pagan solos en este proyecto son los que atacan problemas cuadráticos (pares para LSH, vecinos para ANN). Los sketches de flujo (Bloom, Count-Min, DGIM) muestran bien su compromiso precisión–memoria, pero con 160 mil eventos la memoria no es el cuello de botella. Su valor real aparece en un sistema que procese el flujo de contrataciones de forma continua durante años, con memoria fija.
+
+**Lo que no se puede aproximar.** Las cifras que responden Q1 y Q2 (HHI, tasas de postor único) se calculan exactas sobre todos los datos. Son agregaciones lineales y baratas, y una aproximación, como una muestra, cambiaba la respuesta (ver Decisiones de volumen).

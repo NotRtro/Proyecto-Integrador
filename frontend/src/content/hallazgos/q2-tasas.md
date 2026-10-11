@@ -1,5 +1,12 @@
-PENDIENTE: borrar esta línea al redactar la interpretación.
+**Primero, qué mide "postor" en estos datos.** El OCDS del OECE informa `numberOfTenderers` pero no publica las ofertas, y su documentación no define el campo. Los valores lo delatan: la Adjudicación Simplificada tiene una mediana de 12 "postores", el 60 % de sus procesos tiene 10 o más, y hay licitaciones con 282. En la contratación pública peruana esas cifras corresponden a **participantes registrados**, no a ofertas presentadas: inscribirse es gratuito y muchos se registran solo para ver las bases. Entonces **"un postor" significa que nadie más se registró**, la forma más extrema de falta de competencia, y la tasa medida es una **cota inferior** de los procesos con una sola oferta, que no se pueden observar con estos datos.
 
-Preguntas guía: ¿En qué modalidades, montos, departamentos o niveles es más frecuente un solo postor? ¿Cuánto pesa el "sin dato"?
+**La modalidad explica casi todo.** La tasa global es de 12–14 % según el año, pero se parte en dos mundos:
 
-Usar las cifras de la sección, el contexto peruano y sus límites (señal, no prueba).
+- **No competitivas por diseño:** Contratación Internacional (98 %), Contratación Directa (89 %), regímenes especiales (75 %) y convenios (62 %). La ley permite contratar directamente por emergencia, proveedor único, entre entidades públicas o bajo reglas de organismos internacionales. Un solo postor ahí es la norma, no un hallazgo.
+- **Competitivas:** en Licitación Pública (0,6 %), Concurso Público (0,7 %), Comparación de Precios (1,0 %), las nuevas modalidades abreviadas (1,2–1,7 %), Adjudicación Simplificada (1,8 %) y Subasta Inversa (2,4 %), un solo participante es raro. La Subasta Inversa, pensada para bienes comunes con muchos vendedores, tiene la tasa más alta de este grupo: cuando el bien es un nicho, nadie más se presenta.
+
+**Por eso las demás dimensiones engañan si no se controla la modalidad.** El nivel nacional (29 %) y Lima (29 %) parecen poco competitivos porque concentran las compras internacionales (medicamentos, defensa) y las contrataciones directas de los ministerios. Los servicios (21 %) superan a los bienes (8 %) y a las obras (2 %) por el mismo motivo. **Tumbes (35 %)** es el caso más llamativo: el 38 % de sus procesos son contrataciones directas, frente al 6 % nacional, con picos en mayo de 2023 y entre abril y julio de 2025. Coincide con las emergencias por lluvias de la costa norte, cuando la ley habilita la contratación directa por desastre. Piura (11 %) y Lambayeque (10 %), vecinos con el mismo problema, lo confirman. Habría que verificar la causal en cada expediente.
+
+**Lo que sí es una señal: los procesos pequeños.** La banda de menos de S/ 100 mil tiene 20 % de postor único, frente a 9 % en la banda media. Son compras de bajo valor y poco atractivas para proveedores de fuera de la localidad.
+
+**El "sin dato" pesa.** Falta el número de postores en el 7–13 % de los procesos según el año, y en el 24 % de las Licitaciones Públicas. Si los procesos sin dato fueran justamente los menos competidos, la tasa estaría subestimada.

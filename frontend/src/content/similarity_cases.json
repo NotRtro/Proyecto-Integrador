@@ -1,4 +1,122 @@
 {
-  "instrucciones": "Casos de similitud revisados por el equipo. Tomar pares de artifacts/similarity/case_candidates.json, buscarlos en SEACE por su nomenclatura (left_tender_code / right_tender_code), y completar 'interpretacion' y 'limitacion' con lo verificado. Cambiar 'estado' a 'validado' solo después de revisar el expediente.",
-  "casos": []
+  "instrucciones": "Casos de similitud interpretados. Cada par sale de artifacts/similarity/case_candidates.json (o de los pares del mismo procedimiento) y se revisó en el registro OCDS completo de ambos procesos: modalidad, participantes, adjudicaciones y contratos. 'estado' indica hasta dónde llegó la revisión; la nomenclatura permite ubicar cada proceso en el buscador público del SEACE para revisar el expediente (bases, actas, causal).",
+  "casos": [
+    {
+      "left": "ocds-dgv273-seacev3-2025-137923-24",
+      "right": "ocds-dgv273-seacev3-2025-137923-27",
+      "titulo": "Obra y supervisión del Centro de Salud Enrique Montenegro (PRONIS)",
+      "tipo": "misma entidad, ≤ 30 días",
+      "jaccard": 0.708,
+      "left_tender_code": "LP-SM-10-2025-PRONIS-1",
+      "right_tender_code": "CP-SM-6-2025-PRONIS-1",
+      "entidades": "Programa Nacional de Inversiones en Salud",
+      "estado": "revisado en OCDS",
+      "interpretacion": "El mismo día (21 de abril de 2025) el PRONIS convocó la obra de mejoramiento del centro de salud de San Juan de Lurigancho por licitación pública (S/ 260,5 millones) y su supervisión por concurso público (S/ 13,3 millones, el 5 % de la obra, con 50 participantes registrados). Comparten el texto porque describen el mismo proyecto (CUI 2427400); solo cambia 'ejecución' por 'supervisión'. Es un patrón legítimo y esperado: la normativa exige que las obras grandes tengan un supervisor independiente del contratista, y convocarlos juntos evita que la obra empiece sin control. Ambas se convocaron días antes de que entrara en vigencia la Ley 32069.",
+      "limitacion": "Es el tipo de par que más infla la categoría 'misma entidad en 30 días' sin indicar ningún problema. Al cierre de los datos ninguno de los dos tenía buena pro registrada."
+    },
+    {
+      "left": "ocds-dgv273-seacev3-2023-1307-160",
+      "right": "ocds-dgv273-seacev3-2023-1307-162",
+      "titulo": "Víveres para ollas comunes de Lima por dos modalidades",
+      "tipo": "misma entidad, ≤ 30 días",
+      "jaccard": 1.0,
+      "left_tender_code": "SIE-SIE-5-2023-MML-OGA-OL-1",
+      "right_tender_code": "LP-SM-5-2023-MML-OGA-OL-1",
+      "entidades": "Municipalidad Metropolitana de Lima",
+      "estado": "revisado en OCDS",
+      "interpretacion": "Con cuatro días de diferencia (1 y 5 de junio de 2023), la Municipalidad de Lima convocó con el mismo texto el suministro de víveres para las ollas comunes (Ley 31458): una subasta inversa electrónica de S/ 75,7 millones, adjudicada a Agro Imperio Perú por S/ 60,8 millones (80 % del valor estimado), y una licitación pública de S/ 21,8 millones, adjudicada al Consorcio Valentina por S/ 13,4 millones (61 %). No es una división para eludir controles: las dos partes usan modalidades competitivas, con 25 y 27 participantes. La explicación más probable es que los víveres con ficha técnica en el listado de bienes comunes deben comprarse por subasta inversa y el resto por licitación. La competencia funcionó: ambos se adjudicaron muy por debajo del valor estimado.",
+      "limitacion": "El texto es idéntico porque el sistema registra la descripción general del requerimiento, no la lista de productos. Confirmar qué víveres fueron a cada procedimiento exige revisar las bases en el SEACE."
+    },
+    {
+      "left": "ocds-dgv273-seacev3-1089171",
+      "right": "ocds-dgv273-seacev3-1132261",
+      "titulo": "Hospital Regional de Loreto: licitación sin adjudicar y reconvocatoria",
+      "tipo": "misma entidad, > 30 días",
+      "jaccard": 0.704,
+      "left_tender_code": "LP-SM-8-2024-GRL-OPIPP-CS-1",
+      "right_tender_code": "LP-SM-2-2025-GRL-OPIPP-CS-1",
+      "entidades": "Gobierno Regional de Loreto – Organismo Público de Infraestructura para la Productividad",
+      "estado": "revisado en OCDS",
+      "interpretacion": "El mejoramiento del Hospital Regional de Loreto Felipe Arriola Iglesias (CUI 2526257) se licitó en diciembre de 2024 por S/ 1 058 millones y no llegó a adjudicarse. En julio de 2025 se volvió a convocar con otra nomenclatura por S/ 990 millones; con 13 participantes registrados, la buena pro fue al CONSORCIO SAN JUAN en setiembre de 2025 por S/ 989,75 millones, el 99,98 % del valor estimado. El caso conecta las tres preguntas. Explica la concentración de Loreto en la Q1: ese contrato vale más que todo lo demás adjudicado en el departamento. Es una repetición de la Q3 que la regla de reconvocatoria no detecta, porque cambia la nomenclatura y no solo el número final. Y muestra una competencia débil en precio, con una adjudicación prácticamente al valor de referencia. Además, la licitación de 2024 aparece cuatro veces en el OCDS y la de 2025 dos, cada una con distinto ocid.",
+      "limitacion": "El registro no dice por qué la primera licitación no se adjudicó (desierta, nulidad o cancelación) ni cuántas ofertas válidas hubo en la segunda. Adjudicar cerca del valor estimado es común en obras grandes y no prueba sobreprecio."
+    },
+    {
+      "left": "ocds-dgv273-seacev3-962832",
+      "right": "ocds-dgv273-seacev3-1037806",
+      "titulo": "Agua y alcantarillado de Carabayllo: un año sin adjudicar",
+      "tipo": "misma entidad, > 30 días",
+      "jaccard": 0.771,
+      "left_tender_code": "LP-SM-5-2023-PASLC-1",
+      "right_tender_code": "AS-SM-1-2024-PASLC-1",
+      "entidades": "Programa Agua Segura para Lima y Callao",
+      "estado": "revisado en OCDS",
+      "interpretacion": "La obra de agua potable y alcantarillado de los sectores 352 a 360 del esquema Carabayllo se licitó en agosto de 2023 por S/ 729 millones, con 64 participantes registrados, y no tiene buena pro en el registro. Casi un año después (julio de 2024) aparece de nuevo, ahora como Adjudicación Simplificada y por S/ 847 millones (16 % más), también sin adjudicación registrada. Una nomenclatura AS para una obra de este tamaño suele corresponder a un procedimiento derivado de una licitación fallida. El caso ilustra un problema conocido de la inversión en saneamiento: proyectos grandes que se convocan una y otra vez mientras el presupuesto se actualiza al alza.",
+      "limitacion": "No sabemos si se adjudicó por otra vía ni la causa de cada fracaso. Que en 64 participantes registrados no se llegara a la buena pro sugiere bases difíciles de cumplir o impugnaciones, pero eso solo se confirma en el expediente."
+    },
+    {
+      "left": "ocds-dgv273-seacev3-1044542",
+      "right": "ocds-dgv273-seacev3-1139157",
+      "titulo": "Microcubetas para hemoglobinómetros: los mismos dos proveedores, por contratación directa",
+      "tipo": "entidades distintas",
+      "jaccard": 0.714,
+      "left_tender_code": "DIRECTA-PROC-2-2024-RPSA-1",
+      "right_tender_code": "DIRECTA-DIRECTA-23-2025-CENARES / MINSA-1",
+      "entidades": "Red Periférica de Salud Arequipa (GORE Arequipa) y CENARES (MINSA)",
+      "estado": "revisado en OCDS",
+      "interpretacion": "Una red de salud regional (agosto de 2024, S/ 0,96 millones) y la central nacional de abastecimiento del MINSA (agosto de 2025, S/ 45 millones) compran por contratación directa el mismo insumo: microcubetas descartables para hemoglobinómetros HemoCue y Hemocontrol. En ambos casos se adjudica a los mismos dos proveedores, Diagnóstica Peruana y Simed Perú, uno por marca. Las microcubetas solo sirven al equipo de su marca, así que una vez instalados los hemoglobinómetros (base del tamizaje de anemia, prioridad sanitaria nacional) solo puede venderlas el distribuidor autorizado y la ley permite contratar directamente al proveedor único. Es una dependencia estructural: la compra del equipo decide años de compras sin competencia de sus insumos.",
+      "limitacion": "La exclusividad de cada distribuidor se presume por la marca y la modalidad; la causal exacta de la contratación directa está en el expediente. Lo que sugiere el caso, evaluar el costo total de los consumibles al comprar equipos, es una recomendación de política, no un hallazgo de irregularidad."
+    },
+    {
+      "left": "ocds-dgv273-seacev3-2024-167507-17",
+      "right": "ocds-dgv273-seacev3-2024-10207-20",
+      "titulo": "Seguridad y vigilancia: el mismo texto en muchas entidades",
+      "tipo": "entidades distintas",
+      "jaccard": 1.0,
+      "left_tender_code": "CP-SM-8-2024-DIRIS-LC-1",
+      "right_tender_code": "CP-SM-2-2024-HNSEB-1",
+      "entidades": "DIRIS Lima Centro, Hospital Nacional Sergio E. Bernales y SAT de Chiclayo",
+      "estado": "revisado en OCDS",
+      "interpretacion": "'Servicio de seguridad y vigilancia' aparece con el mismo texto en entidades de todo el país. La DIRIS Lima Centro lo contrató por S/ 26,9 millones (51 participantes, adjudicado al 79 % del valor estimado), el Hospital Sergio Bernales por S/ 1,6 millones (42 participantes, adjudicado al 100 %) y el SAT de Chiclayo por S/ 0,44 millones (9 participantes, 87 %). Es un servicio estandarizable que cada entidad licita por separado, con distintos resultados de precio. Es el caso típico donde una compra corporativa o un acuerdo marco de Perú Compras podría ahorrar costos de procesamiento y conseguir mejores precios por volumen. Es la lectura de 'muchas entidades a la vez' de la Q3.",
+      "limitacion": "Un texto genérico idéntico no implica requisitos idénticos (número de puestos, turnos, zonas). El Jaccard sobre descripciones cortas exagera la similitud. El proceso del hospital además figura dos veces en el OCDS."
+    },
+    {
+      "left": "ocds-dgv273-seacev3-2023-1316-3",
+      "right": "ocds-dgv273-seacev3-2023-1340-6",
+      "titulo": "Transporte de residuos sólidos en Comas y San Luis: tres participantes y adjudicación al valor estimado",
+      "tipo": "entidades distintas",
+      "jaccard": 0.714,
+      "left_tender_code": "CP-SM-4-2023-CS/MDC-1",
+      "right_tender_code": "CP-SM-1-2023-MDSL/CS-1",
+      "entidades": "Municipalidades distritales de Comas y San Luis (Lima)",
+      "estado": "revisado en OCDS",
+      "interpretacion": "Dos municipalidades de Lima contratan en 2023 el alquiler de vehículos para transportar los residuos sólidos a su disposición final: Comas por S/ 101,9 millones y San Luis por S/ 4,2 millones. Los dos concursos tuvieron solo 3 participantes registrados y se adjudicaron prácticamente al valor estimado (100 % y 99,6 %). Es un servicio esencial, de contratos largos y con pocos operadores capaces de prestarlo, que combina las señales de la Q1 (pocos proveedores) y de la Q2 (poca competencia). Que los distritos de Lima lo contraten por separado deja escala sin aprovechar.",
+      "limitacion": "Pocos participantes en un servicio especializado puede reflejar un mercado pequeño y no un direccionamiento. La comparación de precios entre distritos exige normalizar por toneladas y años de contrato, que el OCDS no trae."
+    },
+    {
+      "left": "ocds-dgv273-seacev3-1155347",
+      "right": "ocds-dgv273-seacev3-1155360",
+      "titulo": "Un proceso publicado dos veces: la compra de la Quinta Heeren",
+      "tipo": "mismo procedimiento (copia)",
+      "jaccard": 1.0,
+      "left_tender_code": "DIRECTA-DIRECTA-4-2025-MML/OGA/OL.-1",
+      "right_tender_code": "DIRECTA-DIRECTA-4-2025-MML-OGA-OL-1",
+      "entidades": "Municipalidad Metropolitana de Lima",
+      "estado": "revisado en OCDS",
+      "interpretacion": "Es el mismo proceso publicado con dos ocid: la misma fecha (26 de setiembre de 2025), el mismo monto (S/ 135,9 millones) y una nomenclatura que solo difiere en la puntuación. Uno de los registros está vacío y el otro tiene la adjudicación a Inversiones Quinta Heeren S.A. y el contrato firmado. La contratación directa es la modalidad que la ley prevé para comprar un inmueble existente, en este caso para un proyecto de recuperación del patrimonio del Centro Histórico. Este caso motivó la marca de 'mismo procedimiento' de la Q3: la deduplicación por ocid no lo detecta, cuenta dos veces el monto convocado y crea una falsa 'repetición'.",
+      "limitacion": "La marca de 'mismo procedimiento' (misma entidad y misma nomenclatura sin signos) agrupa copias como esta con ítems de un procedimiento publicados por separado, que sí son contratos distintos; distinguirlos exige comparar los ítems. Tampoco capta copias con nomenclaturas distintas, como el caso siguiente."
+    },
+    {
+      "left": "ocds-dgv273-seacev3-1174229",
+      "right": "ocds-dgv273-seacev3-1176421",
+      "titulo": "Agua para Pucusana por Obras por Impuestos",
+      "tipo": "misma entidad, ≤ 30 días",
+      "jaccard": 0.806,
+      "left_tender_code": "RES-PROC-1-2025-PASLC-OXI-1",
+      "right_tender_code": "RES-PROC-1-2025-PASLC-1",
+      "entidades": "Programa Agua Segura para Lima y Callao",
+      "estado": "revisado en OCDS",
+      "interpretacion": "Dos registros del mismo día (4 de diciembre de 2025) y el mismo monto (S/ 291,5 millones) para el expediente técnico y la obra de agua potable y alcantarillado de Pucusana. La nomenclatura del primero dice OXI: es un proceso de Obras por Impuestos, en el que una empresa privada financia y ejecuta la obra y recupera la inversión con certificados que descuentan su impuesto a la renta. El segundo registro trae la adjudicación a Corporación Lindley S.A., con un único participante. En este régimen el único postor es lo esperable: es la empresa que propone financiar el proyecto.",
+      "limitacion": "Por tener nomenclaturas distintas, el par no se marca como mismo procedimiento aunque probablemente sea una copia, y un régimen especial con un solo participante no es comparable con una licitación. Leer estos procesos con las reglas de los procedimientos competitivos llevaría a conclusiones equivocadas."
+    }
+  ]
 }

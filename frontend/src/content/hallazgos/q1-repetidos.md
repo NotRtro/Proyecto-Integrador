@@ -1,5 +1,10 @@
-PENDIENTE: borrar esta línea al redactar la interpretación.
+**Cada vez más adjudicaciones van a proveedores conocidos.** Sobre el flujo ordenado por fecha, la proporción de adjudicaciones a un proveedor que ya había ganado antes con la misma entidad es 20 % en 2023, 33 % en 2024 y 39 % en 2025. El salto de 2023 a 2024 es en buena parte un artefacto: el flujo empieza en 2023 sin historia previa, así que ese año casi todo par entidad–proveedor es "nuevo". La comparación limpia es 2024 frente a 2025: **seis puntos más en un año**, con historia acumulada en ambos.
 
-Preguntas guía: ¿Qué proporción de adjudicaciones va a proveedores que ya ganaron con la entidad? ¿Es fidelización esperable (servicios recurrentes) o una señal de dependencia?
+**¿Fidelización esperable o dependencia?** Las dos cosas conviven:
 
-Usar las cifras de la sección, el contexto peruano y sus límites (señal, no prueba).
+- **Esperable:** servicios recurrentes como mantenimiento, combustible, alimentos y vigilancia, y la contratación repetida de profesionales como "terceros" (locadores) en entidades como el OEFA, que la Q3 muestra con miles de procesos casi idénticos. Que el mismo proveedor vuelva a ganar puede indicar buen desempeño y mercados locales con pocas alternativas.
+- **Señal de alerta:** cuando la repetición se combina con HHI alto (Q1) y pocos postores (Q2) en la misma entidad. Ahí la entidad depende de un proveedor que no compite. Es el cruce que conviene priorizar para revisión.
+
+**Por qué se usa un Bloom Filter.** La pregunta "¿este proveedor ya ganó con esta entidad?" se responde en el instante en que llega cada adjudicación. Guardar los 112 mil pares distintos en un conjunto exacto cuesta unos 13,6 MB en Python. Un filtro de 256 KB responde lo mismo con menos de 0,3 % de falsos positivos al final del flujo y ningún falso negativo: nunca dice "nuevo" a un proveedor que ya ganó. Uno de 64 KB se equivoca en el 3 % de los pares nuevos mientras se llena, pero en el 11 % cuando está lleno. Para un tablero de supervisión que marca "proveedor recurrente", un falso positivo ocasional es aceptable. Uno negativo no lo sería, y el Bloom Filter no los produce.
+
+**Límite.** Los consorcios reciben un identificador nuevo en cada proceso, así que las mismas empresas ganando como consorcios distintos cuentan como proveedores nuevos. La tasa real de repetición es mayor que la medida.

@@ -1,5 +1,9 @@
-PENDIENTE: borrar esta línea al redactar la interpretación.
+**Los departamentos más concentrados son amazónicos o de mercado pequeño.** En 2025 encabezan Loreto (HHI 2 547), Madre de Dios (1 296), Huancavelica (1 097), Pasco (1 066) y Amazonas (948). Los menos concentrados son Apurímac, Áncash, Ayacucho y Huánuco, con HHI menores a 100: muchas entidades contratan con muchos proveedores distintos.
 
-Preguntas guía: ¿Qué departamentos concentran más y cuánto pesan los consorcios en esa lectura?
+**Al excluir los consorcios, casi toda esa concentración desaparece.** El HHI de Loreto cae de 2 547 a 275, el de Amazonas de 948 a 105 y el de Madre de Dios de 1 296 a 135. Es decir, la concentración departamental no viene de muchas empresas locales dominantes sino de uno o dos consorcios que ganaron obras enormes. El caso más claro es Loreto: el CONSORCIO SAN JUAN ganó en 2025 la obra del Hospital Regional de Loreto por S/ 990 millones, más que todo el resto de lo adjudicado en el departamento. La Q3 encontró el mismo proyecto convocado dos veces: una licitación de S/ 1 058 millones en diciembre de 2024 que no llegó a adjudicarse y la reconvocatoria de julio de 2025.
 
-Usar las cifras de la sección, el contexto peruano y sus límites (señal, no prueba).
+**Moquegua va al revés.** Su HHI sube de 614 a 1 010 al quitar los consorcios: ahí los consorcios reparten el monto, pero lo que se adjudica a empresas individuales se concentra en pocas. Es un patrón distinto al amazónico y conviene revisarlo entidad por entidad.
+
+**Cómo leerlo.** En departamentos con menos mercado, como la Amazonía, con pocas empresas capaces de ejecutar grandes obras y alto costo logístico, es esperable que una obra domine el año. La señal útil no es el HHI alto en sí, sino si se repite año tras año con los mismos actores. Eso exige seguir a las empresas detrás de los consorcios, que el OCDS no publica.
+
+**Límite.** El departamento es el domicilio del comprador. Una obra que el Gobierno Regional de Loreto ejecuta en Loreto cuenta bien, pero las obras que un ministerio con sede en Lima ejecuta en Loreto cuentan para Lima.
