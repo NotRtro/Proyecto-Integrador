@@ -15,7 +15,8 @@ function BloomLab({ d }) {
   const curve = useMemo(() => Array.from({ length: 13 }, (_, i) => {
     const lb = 14 + i
     const observed = d.bloom.find(r => r.bits === 2 ** lb && r.hashes === hashes)
-    return { bits: `2^${lb}`, teórica: bloomFpr(2 ** lb, hashes, n), observada: observed?.observed_fpr }
+    // Filtro lleno en ambos lados: la curva usa n final y el punto, las sondas medidas al final del flujo.
+    return { bits: `2^${lb}`, teórica: bloomFpr(2 ** lb, hashes, n), observada: observed?.final_fpr ?? observed?.observed_fpr }
   }), [hashes, n, d.bloom])
   const exact = d.bloom[0]?.exact_bytes
   return <FindingModule id="lab-bloom" part="Parte IV · Bloom Filter" question="¿Cuánta memoria hace falta para recordar qué proveedores ya ganaron con cada entidad, y cuántos falsos positivos cuesta?"
@@ -33,7 +34,7 @@ function BloomLab({ d }) {
           <Stat label="Falsos positivos (teórico)" value={percent(bloomFpr(bits, hashes, n), 2)} tone="orange" />
           <Stat label="Falsos negativos" value={integer(d.bloom.reduce((s, r) => s + r.fn, 0))} note="siempre 0 (verificado)" tone="green" />
         </div>
-        <Card title="Tasa de falsos positivos según el tamaño del filtro" subtitle={`k = ${hashes}; los puntos son lo observado en el flujo`}>
+        <Card title="Tasa de falsos positivos según el tamaño del filtro" subtitle={`k = ${hashes}; curva teórica con el filtro lleno y puntos medidos con sondas al final del flujo`}>
           <div style={{ width: '100%', height: 280 }}><ResponsiveContainer>
             <LineChart data={curve} margin={{ left: 8, right: 16 }}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="bits" /><YAxis tickFormatter={v => percent(v, 0)} />
               <Tooltip formatter={v => percent(v, 3)} /><Legend /><Line dataKey="teórica" stroke="#de7c45" strokeWidth={2.5} dot={false} />
@@ -42,7 +43,8 @@ function BloomLab({ d }) {
         </Card>
       </div>
     </div>
-    <DataTable rows={d.bloom.map(r => ({ bits: r.bits, k: r.hashes, 'k óptimo': r.optimal_hashes, memoria: bytes(r.bytes), 'FP observados': r.fp, 'FPR observado': percent(r.observed_fpr, 3), 'FPR teórico final': percent(r.theoretical_fpr, 3), 'µs por operación': decimal(r.operation_us, 1) }))} />
+    <DataTable rows={d.bloom.map(r => ({ bits: r.bits, k: r.hashes, 'k óptimo': r.optimal_hashes, memoria: bytes(r.bytes), 'FP en el flujo': r.fp, 'FPR flujo (observado)': percent(r.observed_fpr, 3), 'FPR flujo (teórico)': r.expected_stream_fpr == null ? '—' : percent(r.expected_stream_fpr, 3), 'FPR final (sondas)': r.final_fpr == null ? '—' : percent(r.final_fpr, 3), 'FPR final (teórico)': percent(r.theoretical_fpr, 3), 'µs por operación': decimal(r.operation_us, 1) }))} />
+    <p className="hint">El flujo consulta el filtro mientras se llena: su FPR se compara con la fórmula evaluada con la ocupación de cada consulta. El FPR final se mide con 20 000 claves nunca insertadas y se compara con la fórmula con los n pares del final.</p>
   </FindingModule>
 }
 

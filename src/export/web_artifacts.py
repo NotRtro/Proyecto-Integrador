@@ -5,7 +5,7 @@ usa la web y que se cumplan invariantes que cualquier error de cálculo romperí
 conservación de montos, rangos de métricas, garantías teóricas de las estructuras
 aproximadas y equivalencias entre algoritmos. Si un control falla, la corrida falla.
 
-Artefacto: metadata/artifact_validation.json (controles y pendientes académicos).
+Artefacto: metadata/artifact_validation.json (controles y pendientes del pipeline).
 """
 
 import json
@@ -16,6 +16,9 @@ import pandas as pd
 from src.common import now, save_json
 from src.config import ARTIFACTS, PROCESSED
 from src.export import decisions
+
+# Diferencia absoluta admitida entre el FPR medido y el teórico (20 000 sondas: error estándar < 0,4 pp).
+BLOOM_TOLERANCE = 0.02
 
 REQUIRED = [
     'metadata/source_manifest.json',
@@ -34,6 +37,7 @@ REQUIRED = [
     'eda/concentration_metrics.json',
     'eda/buyer_supplier_hhi.csv',
     'eda/single_bidder_rates.csv',
+    'eda/bidders_by_modality.csv',
     'similarity/lsh_parameter_grid.csv',
     'similarity/minhash_error.csv',
     'similarity/s_curve_observed.csv',
@@ -90,6 +94,7 @@ def analytic_checks():
     scaling = read('ann/scaling.csv').sort_values('corpus_size')
     cms = read('streaming/cms_grid.csv')
     dgim = read('streaming/dgim_grid.csv')
+    bloom = read('streaming/bloom_grid.csv')
     bench = read('association/algorithm_benchmark.csv')
     rules = read('association/rules.csv')
     return {
@@ -107,7 +112,12 @@ def analytic_checks():
             for c in ['recall_at_5', 'recall_at_10']
         ),
         'exact_search_grows_with_corpus': bool(scaling.exact_mean_ms.iloc[-1] > scaling.exact_mean_ms.iloc[0]),
-        'bloom_zero_false_negatives': bool((read('streaming/bloom_grid.csv').fn == 0).all()),
+        'bloom_zero_false_negatives': bool((bloom.fn == 0).all()),
+        # Misma ocupación del filtro en ambos lados de cada comparación (ver part4.run).
+        'bloom_matches_theory': bool(
+            ((bloom.final_fpr - bloom.theoretical_fpr).abs() <= BLOOM_TOLERANCE).all()
+            and ((bloom.observed_fpr - bloom.expected_stream_fpr).abs() <= BLOOM_TOLERANCE).all()
+        ),
         'cms_no_underestimate': bool((cms.underestimates == 0).all()),
         'cms_within_error_bound': bool((cms.within_bound >= cms.guaranteed).all()),
         'dgim_within_bound': bool((dgim.relative_error.dropna() <= 0.5).all()),
@@ -126,11 +136,8 @@ def run():
         raise RuntimeError(f'Faltan artefactos: {missing}')
     checks = {**monetary_checks(), **analytic_checks()}
     selected = read('association/selected_rules.json')
-    pending = [
-        'Interpretaciones del equipo en frontend/src/content (hallazgos, reglas y casos de similitud)',
-        'Validación humana en SEACE de los casos de similitud',
-        'Grabación o publicación de la demostración',
-    ]
+    # Las interpretaciones de frontend/src/content las verifica el test de vitest content.test.js.
+    pending = []
     if selected['found'] < 8:
         pending.append('Menos de ocho reglas superan los criterios')
     result = {

@@ -45,3 +45,25 @@ def test_count_min_never_underestimates_and_meets_bound():
     within = sum(e <= epsilon(256) * len(values) for e in errors) / len(errors)
     assert within >= 1 - delta(4)
     assert sketch.total == len(values)
+
+
+def test_stream_bloom_compares_against_theory_at_same_occupancy(monkeypatch):
+    """El FPR observado en el flujo se compara con el teórico de la ocupación de cada consulta,
+    y el FPR final (sondas nunca insertadas) con el teórico del filtro lleno."""
+    from collections import namedtuple
+
+    from src.part4 import run as part4
+
+    monkeypatch.setattr(part4, 'BLOOM_BITS', [2**13])
+    monkeypatch.setattr(part4, 'BLOOM_HASHES', [3])
+    Event = namedtuple('Event', 'event_date buyer_id supplier_id single_bidder high_amount')
+    rng = random.Random(7)
+    events = [
+        Event('2024-01-01', f'b{rng.randrange(300)}', f's{rng.randrange(400)}', False, False) for _ in range(6000)
+    ]
+    row = part4.process_awards(iter(events))['bloom'][0]
+    assert row['fn'] == 0
+    assert row['observed_fpr'] == pytest.approx(row['expected_stream_fpr'], abs=0.02)
+    assert row['final_fpr'] == pytest.approx(row['theoretical_fpr'], abs=0.02)
+    # La ocupación crece durante el flujo: el promedio del flujo queda bajo el FPR final.
+    assert row['expected_stream_fpr'] < row['theoretical_fpr']

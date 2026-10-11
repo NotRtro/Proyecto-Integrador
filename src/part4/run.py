@@ -38,6 +38,7 @@ from src.part4.dgim import DGIM
 
 BLOOM_BITS = [2**17, 2**19, 2**21]
 BLOOM_HASHES = [3, 5, 7]
+BLOOM_PROBES = 20000
 CMS_WIDTHS = [512, 2048, 8192]
 CMS_DEPTHS = [3, 5]
 DGIM_CONFIGS = [('eventos', 1000), ('eventos', 10000), ('días', 7), ('días', 30)]
@@ -123,6 +124,10 @@ def process_awards(events):
             stats['negative_queries'] += not known
             stats['fp'] += predicted and not known
             stats['fn'] += known and not predicted
+            if not known:
+                # FPR teórico con la ocupación del filtro en el momento de esta consulta:
+                # promediado sobre el flujo, es comparable con el FPR observado acumulado.
+                stats['expected_fp'] += theoretical_fpr(*key, len(seen))
         seen.add(pair)
 
         supplier_counts[event.supplier_id] += 1
@@ -155,6 +160,7 @@ def process_awards(events):
                         hashes=k,
                         inserted=len(seen),
                         observed_fpr=stats['fp'] / max(1, stats['negative_queries']),
+                        expected_fpr=stats['expected_fp'] / max(1, stats['negative_queries']),
                         theoretical_fpr=theoretical_fpr(m, k, len(seen)),
                     )
                 )
@@ -177,9 +183,13 @@ def process_awards(events):
             print(f'Flujos: {n:,} adjudicaciones', flush=True)
 
     exact_bytes = approximate_set_bytes(seen)
+    # Sondas que nunca entraron al flujo: miden el FPR con el filtro lleno, que es lo que
+    # predice la fórmula con n = pares insertados al final.
+    probes = [f'sonda|{i}' for i in range(BLOOM_PROBES)]
     bloom_rows = []
     for (m, k), bloom in blooms.items():
         stats = bloom_stats[(m, k)]
+        expected_fp = stats.pop('expected_fp', 0.0)
         bloom_rows.append(
             dict(
                 bits=m,
@@ -189,6 +199,8 @@ def process_awards(events):
                 events=n,
                 **stats,
                 observed_fpr=stats['fp'] / max(1, stats['negative_queries']),
+                expected_stream_fpr=expected_fp / max(1, stats['negative_queries']),
+                final_fpr=sum(p in bloom for p in probes) / BLOOM_PROBES,
                 theoretical_fpr=bloom.theoretical_fpr(len(seen)),
                 bytes=bloom.bytes,
                 exact_bytes=exact_bytes,
@@ -358,7 +370,7 @@ def run(spark):
             bloom=dict(
                 inserted=result['bloom'][0]['inserted'],
                 events=result['events'],
-                observed=[{k: r[k] for k in ('bits', 'hashes', 'observed_fpr')} for r in result['bloom']],
+                observed=[{k: r[k] for k in ('bits', 'hashes', 'observed_fpr', 'final_fpr')} for r in result['bloom']],
             ),
             cms={
                 domain: dict(
@@ -376,7 +388,9 @@ def run(spark):
             items=sum(item_counts.values()),
             ordering='Fecha de adjudicación (o de convocatoria si falta), ocid, adjudicación, proveedor.',
             bloom='Clave = (entidad, proveedor). Se consulta antes de insertar: un positivo para un par nunca visto es '
-            'falso positivo. FPR observado acumulado sobre primeras apariciones; el teórico usa la ocupación final.',
+            'falso positivo. Dos comparaciones con la misma ocupación del filtro: (1) FPR observado acumulado en el '
+            'flujo frente al teórico promediado con la ocupación de cada consulta; (2) FPR final medido con '
+            f'{BLOOM_PROBES:,} sondas nunca insertadas frente al teórico con los n pares del final.',
             cms='Frecuencia de proveedores (adjudicaciones) y de códigos UNSPSC (ítems). Error relativo de los 100 más '
             'frecuentes frente a la mitad menos frecuente; cota ε·N con ε = e/w válida con probabilidad 1 - e^-d.',
             dgim=f'Bits: proceso con un solo postor; monto convocado >= S/ {HIGH_AMOUNT:,}. Ventanas de eventos y de '
