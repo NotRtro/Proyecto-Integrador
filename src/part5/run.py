@@ -7,8 +7,9 @@ Pasos:
 1. Apriori frente a FP-Growth sobre la misma muestra (soportes 2 %, 5 % y 10 %): mismos
    conjuntos o la corrida falla; se comparan tiempos.
 2. FP-Growth sobre todas las canastas: conjuntos frecuentes y reglas (soporte >= 2 %,
-   confianza >= 50 %), cada una con su tipo (informativa, normativa, datos faltantes)
-   y sus métricas recalculadas por año.
+   confianza >= 50 %), cada una con su tipo (informativa, normativa, datos faltantes),
+   su improvement frente a sus sub-reglas y sus métricas recalculadas por año. Para
+   interpretar se eligen reglas informativas con improvement >= 5 puntos.
 3. Reglas dirigidas (Q2): ¿qué combinaciones elevan la probabilidad de tener un solo
    postor (y, como contraste, cuatro o más) donde debería haber competencia? Se minan
    procesos con postores informados, sin las modalidades no competitivas por diseño
@@ -29,7 +30,7 @@ from src.common import StepTimer, sample_processes, save_csv, save_json
 from src.common import features as read_features
 from src.config import APRIORI_SAMPLE, spark_session
 from src.part5.apriori import apriori
-from src.part5.rules import automatic_reading, metrics_by_year, pick, rule_kind, targeted_rules
+from src.part5.rules import automatic_reading, improvement, metrics_by_year, pick, rule_kind, targeted_rules
 from src.part5.transactions import ATTRIBUTES, MISSING, transaction
 
 SUPPORTS = [0.02, 0.05, 0.1]
@@ -42,6 +43,8 @@ TARGETS = ['POSTORES=uno', 'POSTORES=cuatro o mas']
 NON_COMPETITIVE_RATE = 0.5
 SELECTED_GENERAL = 5
 SELECTED_SINGLE_BIDDER = 5
+# Una regla general seleccionada debe superar en 5 puntos de confianza a toda sub-regla.
+MIN_IMPROVEMENT = 0.05
 
 
 def baskets(spark):
@@ -120,11 +123,17 @@ def full_rules(tx, total):
             for r in found
         )
         rules.extend(raw_rules)
-    return benchmark, itemsets, rules
+    frequencies = {
+        frozenset(json.loads(r['items'])): r['frequency'] for r in itemsets if r['min_support'] == RULE_SUPPORT
+    }
+    return benchmark, itemsets, rules, frequencies
 
 
-def rules_by_year(raw_rules, tx):
-    """Cada regla con sus métricas globales y por año (recontadas en las canastas del año)."""
+def rules_by_year(raw_rules, tx, frequencies, total):
+    """Cada regla con sus métricas globales y por año (recontadas en las canastas del año).
+
+    El improvement se calcula sobre todas las canastas (vacío en las filas por año).
+    """
     grouped = {}
     for row in tx.groupBy('year', 'items').count().collect():
         grouped.setdefault(str(row['year']), []).append((set(row['items']), row['count']))
@@ -134,7 +143,9 @@ def rules_by_year(raw_rules, tx):
         antecedent, consequent = set(rule.antecedent), set(rule.consequent)
         if rule.lift <= 1:
             continue
-        kind = rule_kind(antecedent | consequent)
+        target = next(iter(consequent)) if len(consequent) == 1 else None
+        kind = rule_kind(antecedent | consequent, target)
+        gain = improvement(antecedent, target, frequencies, total) if target else None
         for metrics in metrics_by_year(antecedent, consequent, grouped):
             rows.append(
                 dict(
@@ -143,6 +154,7 @@ def rules_by_year(raw_rules, tx):
                     kind=kind,
                     antecedent_size=len(antecedent),
                     size=len(antecedent | consequent),
+                    improvement=gain if metrics['year'] == 'Todos' else None,
                     **metrics,
                 )
             )
@@ -217,12 +229,15 @@ def select_rules(general, targeted):
             and r['kind'] == 'informativa'
             and r['support'] >= RULE_SUPPORT
             and r['confidence'] >= RULE_CONFIDENCE
+            and r['improvement'] >= MIN_IMPROVEMENT
             and r['size'] <= 3
         ),
         key=lambda r: (-r['lift'], -r['support']),
     )
     pick(candidates, SELECTED_GENERAL, 'general', chosen)
-    single = [r for r in targeted if r['consequent'] == 'POSTORES=uno' and r['kind'] == 'informativa']
+    single = [
+        r for r in targeted if r['consequent'] == 'POSTORES=uno' and r['kind'] == 'informativa' and r['improvement'] > 0
+    ]
     pick(single, SELECTED_SINGLE_BIDDER, 'postor único (Q2)', chosen, unique_items=True)
     for rule in chosen:
         rule.pop('_items')
@@ -239,9 +254,9 @@ def run(spark):
     with timer.step('Apriori frente a FP-Growth (muestra)'):
         benchmark, sample_itemsets = compare_algorithms(spark)
     with timer.step('FP-Growth sobre todas las canastas'):
-        full_benchmark, full_itemsets, raw_rules = full_rules(tx, total)
+        full_benchmark, full_itemsets, raw_rules, frequencies = full_rules(tx, total)
     with timer.step('reglas por año'):
-        general = rules_by_year(raw_rules, tx)
+        general = rules_by_year(raw_rules, tx, frequencies, total)
     with timer.step('reglas dirigidas a postor único (Q2)'):
         targeted, informed, non_competitive = single_bidder_rules(tx)
     with timer.step('calidad de las canastas'):
@@ -261,6 +276,7 @@ def run(spark):
             'support',
             'confidence',
             'lift',
+            'improvement',
             'antecedent_size',
             'size',
             'count',

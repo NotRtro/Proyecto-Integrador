@@ -31,7 +31,7 @@ export default function RulesLab() {
         <Range label="Soporte mínimo" value={support} onChange={setSupport} min={0.02} max={0.2} step={0.01} />
         <Range label="Confianza mínima" value={confidence} onChange={setConfidence} min={0.5} max={1} step={0.05} />
         <Range label="Lift mínimo" value={lift} onChange={setLift} min={1} max={10} step={0.1} />
-        <p className="hint">Normativa: relaciona solo modalidad, monto y categoría (lo fija la ley) o contratación directa con un postor. Datos faltantes: incluye "sin dato".</p>
+        <p className="hint">Normativa: relaciona solo modalidad, monto y categoría, o predice la modalidad desde el objeto o el monto (lo fija la ley), o contratación directa con un postor. Datos faltantes: incluye "sin dato". Improvement: cuánto supera la confianza de la regla a la de su mejor versión más simple.</p>
       </Filters>
       <div>
         <div className="stat-grid three">
@@ -42,8 +42,8 @@ export default function RulesLab() {
         <Card title="Reglas con mayor lift" subtitle="Bajo los filtros actuales"><ExecutiveBar data={rules.slice(0, 12).map((r, i) => ({ ...r, label: `R${i + 1}` }))} category="label" value="lift" formatter={v => decimal(v)} height={300} /></Card>
       </div>
     </div>
-    <DataTable rows={rules.map((r, i) => ({ id: `R${i + 1}`, si: r.antecedent, entonces: r.consequent, soporte: percent(r.support), confianza: percent(r.confidence), lift: decimal(r.lift), procesos: r.count, tipo: r.kind }))} />
-    <Card title="Reglas seleccionadas para interpretar" subtitle={`${d.selected.found} reglas: generales informativas y de postor único (Q2), sin redundancias`}>
+    <DataTable rows={rules.map((r, i) => ({ id: `R${i + 1}`, si: r.antecedent, entonces: r.consequent, soporte: percent(r.support), confianza: percent(r.confidence), lift: decimal(r.lift), improvement: r.improvement == null ? '—' : decimal(r.improvement, 3), procesos: r.count, tipo: r.kind }))} />
+    <Card title="Reglas seleccionadas para interpretar" subtitle={`${d.selected.found} reglas: generales informativas (improvement ≥ 5 puntos) y de postor único (Q2), sin redundancias`}>
       {d.selected.rules.map(rule => <div className="selected-rule" key={rule.rule_id}>
         <span>{rule.source === 'general' ? 'G' : 'Q2'}</span>
         <div><p><strong>{rule.rule_id}</strong></p><p className="hint">{rule.automatic_reading}</p>

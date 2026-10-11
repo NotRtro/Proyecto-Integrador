@@ -1,6 +1,6 @@
 import pytest
 
-from src.part5.rules import metrics_by_year, pick, rule_kind, targeted_rules
+from src.part5.rules import improvement, metrics_by_year, pick, rule_kind, targeted_rules
 
 
 def test_rule_kind():
@@ -57,3 +57,28 @@ def test_pick_unique_items_gives_diverse_rules():
     chosen = []
     pick(rules, 5, 'q2', chosen, unique_items=True)
     assert [c['antecedent'] for c in chosen] == ['DEP=LIMA ∧ MODALIDAD=X', 'NIVEL=local']
+
+
+def test_rule_kind_recognizes_legal_direction():
+    cp = 'MODALIDAD=Comparación de Precios'
+    # Predecir la modalidad desde el monto redescubre el umbral legal, aunque haya otros ítems.
+    assert rule_kind({'MONTO=bajo', 'POSTORES=dos a tres', cp}, cp) == 'normativa'
+    assert rule_kind({'CAT=works', 'NIVEL=local', 'MODALIDAD=Licitación Pública'}, 'CAT=works') == 'normativa'
+    # Monto y nivel → obras no es una regla legal: el monto no fija el objeto.
+    assert rule_kind({'MONTO=alto', 'NIVEL=local', 'CAT=works'}, 'CAT=works') == 'informativa'
+    assert rule_kind({'NIVEL=regional', 'POSTORES=dos a tres', cp}, cp) == 'informativa'
+
+
+def test_improvement_against_simpler_rules():
+    # 1000 canastas; C en 100 (10 %). A → C 50 %; A ∧ B → C 52 %: solo 2 puntos sobre A → C.
+    f = {
+        frozenset(['C']): 100,
+        frozenset(['A']): 100,
+        frozenset(['A', 'C']): 50,
+        frozenset(['B']): 500,
+        frozenset(['B', 'C']): 60,
+        frozenset(['A', 'B']): 50,
+        frozenset(['A', 'B', 'C']): 26,
+    }
+    assert improvement({'A'}, 'C', f, 1000) == pytest.approx(0.5 - 0.1)
+    assert improvement({'A', 'B'}, 'C', f, 1000) == pytest.approx(0.52 - 0.5)

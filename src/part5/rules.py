@@ -9,28 +9,71 @@ Métricas de A → C sobre n canastas:
     lift = confianza / (frec(C) / n)    (> 1: A y C aparecen juntos más que por azar)
 
 Tipo de regla, para no presentar como hallazgo lo que dicta la ley:
-- normativa: solo relaciona modalidad, monto y categoría. La Ley de Contrataciones fija
-  la modalidad según el objeto y el monto (p. ej. obras de monto alto -> licitación), así
-  que estas reglas confirman la norma más que descubrir un patrón. También lo es
+- normativa: la Ley de Contrataciones fija la modalidad según el objeto (CAT) y el valor
+  estimado (MONTO), p. ej. obras de monto alto -> licitación. Es normativa una regla que
+  solo relaciona esos tres atributos, o que predice la modalidad a partir del objeto o
+  del monto (o al revés), aunque traiga otros ítems: "MONTO=bajo ∧ NIVEL=x →
+  MODALIDAD=Comparación de Precios" redescubre el umbral legal. También lo es
   "Contratación Directa ↔ un postor": la contratación directa se hace con un único
   proveedor por definición.
 - datos faltantes: incluye "sin dato"; describe la calidad del registro, no la compra.
 - informativa: el resto.
+
+Improvement (Bayardo, Agrawal y Gunopulos, 2000): confianza de A → C menos la mejor
+confianza de A' → C con A' ⊂ A (incluido A' = ∅, cuya confianza es la tasa base). Una
+regla con improvement ≈ 0 no aporta nada sobre una regla más simple: "CP ∧ NIVEL=local →
+dos a tres postores" (90 %) solo repite "CP → dos a tres postores" (88 %).
 """
+
+from itertools import combinations
 
 from src.part5.transactions import MISSING, attribute
 
 NORMATIVE_ATTRIBUTES = {'MODALIDAD', 'MONTO', 'CAT'}
+# Determinantes legales de la modalidad: objeto de la contratación y valor estimado.
+MODALITY_DETERMINANTS = {'CAT', 'MONTO'}
 NORMATIVE_PAIRS = [{'MODALIDAD=Contratación Directa', 'POSTORES=uno'}]
 
 
-def rule_kind(items):
+def rule_kind(items, consequent=None):
+    """Tipo de la regla con ítems `items` (antecedente ∪ consecuente).
+
+    Con `consequent` (un ítem) se reconoce además la dirección: predecir la modalidad a
+    partir del objeto o del monto, o el objeto o el monto a partir de la modalidad.
+    """
     items = set(items)
     if any(item.endswith(f'={MISSING}') for item in items):
         return 'datos faltantes'
     if {attribute(item) for item in items} <= NORMATIVE_ATTRIBUTES or any(pair <= items for pair in NORMATIVE_PAIRS):
         return 'normativa'
+    if consequent is not None:
+        target = attribute(consequent)
+        others = {attribute(item) for item in items - {consequent}}
+        if (target == 'MODALIDAD' and others & MODALITY_DETERMINANTS) or (
+            target in MODALITY_DETERMINANTS and 'MODALIDAD' in others
+        ):
+            return 'normativa'
     return 'informativa'
+
+
+def improvement(antecedent, consequent, frequencies, n):
+    """Confianza de A → C menos la mejor confianza de sus sub-reglas A' → C (A' ⊂ A).
+
+    frequencies: {frozenset: frecuencia} con todos los subconjuntos necesarios (si A ∪ C
+    es frecuente, todos sus subconjuntos también lo son, así que FP-Growth los trae).
+    """
+    antecedent = frozenset(antecedent)
+    consequent = frozenset([consequent])
+
+    def confidence(a):
+        if not a:
+            return frequencies[consequent] / n
+        return frequencies[a | consequent] / frequencies[a]
+
+    best_sub = max(
+        confidence(frozenset(sub)) for size in range(len(antecedent)) for sub in combinations(antecedent, size)
+    )
+    return confidence(antecedent) - best_sub
 
 
 def targeted_rules(itemsets, n, consequent, min_count, min_lift, max_antecedent=3):
@@ -56,6 +99,7 @@ def targeted_rules(itemsets, n, consequent, min_count, min_lift, max_antecedent=
         confidence = count / antecedent_count
         lift = confidence / base_rate
         if lift >= min_lift:
+            gain = improvement(antecedent, consequent, itemsets, n)
             rules.append(
                 dict(
                     antecedent=' ∧ '.join(sorted(antecedent)),
@@ -67,7 +111,8 @@ def targeted_rules(itemsets, n, consequent, min_count, min_lift, max_antecedent=
                     lift=lift,
                     base_rate=base_rate,
                     size=len(itemset),
-                    kind=rule_kind(itemset),
+                    improvement=gain,
+                    kind=rule_kind(itemset, consequent),
                 )
             )
     return sorted(rules, key=lambda r: (-r['lift'], -r['count']))
