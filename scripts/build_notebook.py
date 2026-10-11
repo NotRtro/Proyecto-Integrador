@@ -427,9 +427,68 @@ check('Parte V', 'Todo conjunto de compra conjunta frecuente tiene al menos el m
       bool((co['count'] >= cs['min_count']).all()))
 """)
 
+# ---------------------------------------------------------------- Señales
+md("""
+## 9. Q4 · Señales de riesgo por proceso
+
+**Qué se afirma.** Cuatro señales marcan procesos para revisar: un solo participante reportado en modalidades
+competitivas, contratación directa, proveedor dominante y compra repetida detectada por LSH. Son poco frecuentes y
+algunas coinciden más de lo esperable por azar. Ninguna prueba una irregularidad.
+
+**Comprobación.** Las señales se vuelven a calcular aquí con pandas, a partir de las tablas Parquet y de los pares de la
+Parte II, sin usar el código de Spark de `src/signals`. Si las tablas procesadas no están disponibles, se comprueba solo
+la coherencia interna de los artefactos.
+""")
+code("""
+S = csv('integrity/summary.csv'); S = S[S.year.astype(str) == 'Todos'].set_index('signal')
+CO = csv('integrity/cooccurrence.csv'); M = doc('integrity/methodology.json')
+ax = (S.rate * 100).rename(index=S.label).plot.barh(color=[TEAL, ORANGE, NAVY, BROWN]); ax.invert_yaxis()
+ax.set_xlabel('% de procesos evaluables'); ax.set_title('Tasa de cada señal (cada una con su denominador)'); plt.show()
+display(CO[['label_a', 'label_b', 'evaluable_both', 'joint', 'expected_joint', 'lift']].round(2))
+
+counts = csv('integrity/count_distribution.csv')
+check('Q4', 'Cada proceso se cuenta una sola vez en la distribución de señales', counts.processes.sum() == M['processes'])
+check('Q4', 'Ninguna señal marca más procesos de los que puede evaluar', bool((S.flagged <= S.evaluable).all()))
+
+DATA = next((p for p in [Path('../data/processed'), Path('data/processed'), Path('/data/processed')] if p.is_dir()), None)
+if DATA is None:
+    print('Tablas procesadas no disponibles: se omite el recálculo independiente')
+else:
+    P = pd.read_parquet(DATA / 'processes', columns=['ocid', 'modality', 'bidders', 'normalized_text'])
+    A = pd.read_parquet(DATA / 'suppliers', columns=['ocid', 'year', 'buyer_id', 'supplier_id', 'allocated_amount_pen'])
+    A = A.dropna(subset=['allocated_amount_pen', 'supplier_id', 'buyer_id'])
+    A['year'] = A.year.astype(int)  # la partición llega como categoría y multiplicaría los grupos vacíos
+    R = pd.read_parquet(ART / 'similarity/repeated_requirements.parquet',
+                        columns=['left', 'right', 'kind', 'reconvocation', 'same_procedure'])
+    competitive = P.modality.isin(M['competitive_modalities']) & P.bidders.notna()
+    P['single_bidder'] = (P.bidders == 1).where(competitive).astype('float')
+    P['direct'] = (P.modality == 'Contratación Directa').astype('float')
+    # Proveedor dominante: parte del monto anual de la entidad, en entidades con suficientes adjudicaciones
+    buyer = A.groupby(['year', 'buyer_id']).agg(total=('allocated_amount_pen', 'sum'), awards=('ocid', 'nunique'))
+    pair = A.groupby(['year', 'buyer_id', 'supplier_id']).allocated_amount_pen.sum().rename('amount').reset_index()
+    pair = pair.join(buyer[(buyer.awards >= M['min_buyer_awards']) & (buyer.total > 0)], on=['year', 'buyer_id'], how='inner')
+    pair['share'] = pair.amount / pair.total
+    top = A[['ocid', 'year', 'buyer_id', 'supplier_id']].drop_duplicates().merge(pair, on=['year', 'buyer_id', 'supplier_id'])
+    P['dominant_supplier'] = P.ocid.map((top.groupby('ocid').share.max() >= M['dominant_share']).astype('float'))
+    short = R[(R.kind == 'misma entidad, <= 30 días') & ~R.reconvocation & ~R.same_procedure]
+    repeated = set(short.left) | set(short.right)
+    P['repeated_purchase'] = P.ocid.isin(repeated).where(P.normalized_text.str.len() > 0).astype('float')
+    again = pd.DataFrame({s: dict(evaluable=int(P[s].notna().sum()), flagged=int(P[s].sum())) for s in S.index}).T
+    display(again.join(S[['evaluable', 'flagged']], rsuffix='_spark'))
+    check('Q4', 'El recálculo con pandas da los mismos evaluables y marcados que Spark',
+          bool((again.evaluable == S.evaluable).all() and (again.flagged == S.flagged).all()))
+    lifts = []
+    for r in CO.dropna(subset=['lift']).itertuples():
+        both = P[P[r.signal_a].notna() & P[r.signal_b].notna()]
+        expected = both[r.signal_a].sum() * both[r.signal_b].sum() / len(both)
+        lifts.append(abs((both[r.signal_a] * both[r.signal_b]).sum() / expected - r.lift))
+    check('Q4', 'Los lifts de coincidencia recalculados coinciden con los publicados', max(lifts) < 1e-9,
+          f'diferencia máxima {max(lifts):.1e}')
+""")
+
 # ---------------------------------------------------------------- Resumen
 md("""
-## 9. Resumen de comprobaciones
+## 10. Resumen de comprobaciones
 """)
 code("""
 summary = pd.DataFrame(CHECKS)
@@ -440,7 +499,7 @@ display(summary)
 md("""
 **Cómo leer este resumen.** Los controles verifican que cada técnica hace lo que la teoría promete sobre estos datos
 (errores de MinHash, curva S, FPR de Bloom, cotas de Count-Min y DGIM, equivalencia Apriori = FP-Growth) y que los
-datos no se pierden ni duplican en el camino. No verifican la *interpretación*: que un HHI alto, un solo postor o un par
+datos no se pierden ni duplican en el camino. No verifican la *interpretación*: que un HHI alto, un solo postor, una señal de la Q4 o un par
 casi idéntico signifiquen un problema es algo que solo el expediente puede confirmar. Por eso el reporte presenta los
 hallazgos como señales para priorizar revisión, no como pruebas.
 """)

@@ -12,6 +12,7 @@ Proyecto integrador de Minería de Datos Masivos. Analiza los procesos de contra
 | **Q1** | ¿Qué tan concentrada está la adjudicación en pocos proveedores dentro de cada entidad y departamento, y cambió entre años? | HHI con funciones de ventana en Spark (Parte I), Bloom Filter sobre pares entidad–proveedor (Parte IV) |
 | **Q2** | ¿Qué características del proceso se asocian a tener un solo postor? | Tasas por dimensión en Spark (Parte I), FP-Growth dirigido (Parte V), DGIM (Parte IV) |
 | **Q3** | ¿Hay requerimientos casi idénticos convocados repetidamente por una entidad, o por muchas a la vez? | Shingling, MinHash y LSH sobre todo el corpus (Parte II); HNSW e IVF (Parte III) |
+| **Q4** | ¿Dónde se concentran las señales de riesgo y tienden a aparecer juntas en un mismo proceso? | Señales por proceso con joins en Spark, a partir de la competencia (Parte I) y de los requerimientos repetidos de LSH (Parte II) |
 
 Count-Min Sketch (Parte IV) estima frecuencias de proveedores y de códigos UNSPSC. La Parte VI (discusión) está en la propia web.
 
@@ -103,7 +104,8 @@ cd frontend && VITE_STATIC=1 VITE_BASE=/Proyecto-Integrador/ npm run build
 | `src/part4/replay.py` | **Spark Structured Streaming** | Reproduce el flujo una semana por micro-lote (fuente de archivos, `foreachBatch`, checkpoint) |
 | `src/part5/` | **Spark** + local | FP-Growth (MLlib) sobre todas las canastas y sobre los segmentos UNSPSC que se compran juntos; Apriori propio sobre una muestra como referencia |
 | `scripts/build_notebook.py` | local | Genera `notebooks/sustento.ipynb`: un gráfico y una comprobación automática por afirmación |
-| `src/export/web_artifacts.py` | local | 19 controles de consistencia antes de servir la web |
+| `src/signals/` | **Spark** | Cuatro señales de riesgo por proceso (un solo participante, contratación directa, proveedor dominante, compra repetida), su tasa por dimensión y su coincidencia |
+| `src/export/web_artifacts.py` | local | 21 controles de consistencia antes de servir la web |
 | `api/` | FastAPI | Filtra artefactos precalculados; no recalcula métricas oficiales |
 | `frontend/` | React | Reporte por pregunta; controles que recalculan en vivo las curvas teóricas |
 
@@ -119,15 +121,15 @@ Cada módulo explica en su docstring el motor que usa y el motivo, sus entradas 
 - **Nivel de gobierno:** se infiere del nombre de la entidad con reglas ordenadas (99,6 % clasificado). El OCDS no publica este dato.
 - **Proveedores:** se usa un nombre canónico por RUC y un tipo según el prefijo (persona natural, persona jurídica, consorcio, extranjero). Los consorcios reciben un identificador de un solo uso y ocultan a sus integrantes.
 - **Departamento:** es el domicilio del comprador, no el lugar de ejecución.
-- **Privacidad:** no se publican teléfonos ni contactos, ni rankings de personas naturales.
+- **Privacidad:** no se publican teléfonos ni contactos, ni rankings de personas naturales. Las señales de riesgo se asignan a procesos y se resumen por entidad pública, nunca por proveedor.
 
 ## Resultados y verificación
 
 - `artifacts/metadata/`: manifiestos de fuente y de corrida (con el commit del código), calidad, esquema, stopwords y tiempos de procesamiento.
-- `artifacts/{eda,similarity,ann,streaming,association}/`: resultados de cada parte.
-- `artifacts/metadata/artifact_validation.json`: 19 controles, entre ellos conservación de montos, garantías de Bloom, CMS y DGIM, FPR de Bloom igual al teórico con la misma ocupación, equivalencia Apriori = FP-Growth y MinHash que se acerca a la teoría.
+- `artifacts/{eda,similarity,ann,streaming,association,integrity}/`: resultados de cada parte.
+- `artifacts/metadata/artifact_validation.json`: 21 controles, entre ellos conservación de montos, garantías de Bloom, CMS y DGIM, FPR de Bloom igual al teórico con la misma ocupación, equivalencia Apriori = FP-Growth y MinHash que se acerca a la teoría.
 - `notebooks/sustento.ipynb`: el sustento de cada parte con gráficos y comprobaciones automáticas (✔/✘) contra la teoría o la versión exacta; se regenera con `make notebook`.
-- `tests/`: 66 tests de pytest (algoritmos e integración con Spark). `frontend/src/__tests__`: render de todas las páginas con datos reales y completitud del contenido escrito.
+- `tests/`: 68 tests de pytest (algoritmos e integración con Spark). `frontend/src/__tests__`: render de todas las páginas con datos reales y completitud del contenido escrito.
 
 ## Interpretaciones y casos
 
