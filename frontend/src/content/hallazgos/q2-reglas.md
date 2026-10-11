@@ -3,7 +3,7 @@
 - los procesos sin dato de postores;
 - las modalidades donde más de la mitad de los procesos tiene un solo participante (contratación directa e internacional, regímenes especiales, convenios, adjudicaciones selectivas). Es un filtro empírico que se calcula con los datos: una tasa alta no demuestra que la modalidad esté diseñada sin competencia. La población resultante coincide con las modalidades competitivas de las señales (Q4) salvo por 82 procesos de modalidad "Otra". Incluirlas solo redescubriría que la contratación directa tiene un solo proveedor.
 
-Quedan 151 264 procesos competitivos con una tasa base de 1,6 %. Lo que importa no es la confianza, siempre baja, sino el **lift**: cuántas veces más probable es el postor único dentro de la combinación.
+Quedan 151 264 procesos incluidos tras el filtro empírico, con una tasa base de 1,6 %. Lo que importa no es la confianza, siempre baja, sino el **lift**: cuántas veces más probable es el postor único dentro de la combinación.
 
 **Qué tienen en común las combinaciones con mayor lift.** Las cuatro reglas seleccionadas apuntan al mismo perfil: **compras pequeñas o medianas de bienes, en municipalidades, por modalidades simplificadas.**
 
