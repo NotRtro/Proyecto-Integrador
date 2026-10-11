@@ -88,3 +88,82 @@ export function Select({ label, value, onChange, options, all = true, format = v
 export function Range({ label, value, onChange, min, max, step }) {
   return <label className="range"><span>{label}<b>{value}</b></span><input type="range" value={value} onChange={e => onChange(Number(e.target.value))} min={min} max={max} step={step} /></label>
 }
+
+// ---------------------------------------------------------------------------
+// Anatomía de cada hallazgo (enunciado): pregunta → pipeline → visualización →
+// controles → interpretación escrita. La interpretación se lee de
+// src/content/hallazgos/<id>.md, que escribe el equipo.
+
+const narratives = import.meta.glob('./content/hallazgos/*.md', { query: '?raw', import: 'default', eager: true })
+
+export function narrative(id) {
+  return narratives[`./content/hallazgos/${id}.md`] || ''
+}
+
+function inline(text) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong> : part)
+}
+
+// Markdown mínimo: párrafos, listas con "- ", subtítulos "### " y **negritas**.
+export function Markdown({ text }) {
+  const blocks = text.trim().split(/\n\s*\n/)
+  return <div className="markdown">{blocks.map((block, i) => {
+    const lines = block.split('\n')
+    if (lines.every(line => line.trim().startsWith('- '))) {
+      return <ul key={i}>{lines.map((line, j) => <li key={j}>{inline(line.trim().slice(2))}</li>)}</ul>
+    }
+    if (block.startsWith('### ')) return <h4 key={i}>{inline(block.slice(4))}</h4>
+    return <p key={i}>{inline(block.replace(/\n/g, ' '))}</p>
+  })}</div>
+}
+
+export function Interpretation({ id }) {
+  const text = narrative(id)
+  const pending = !text.trim() || text.includes('PENDIENTE')
+  return <div className={`interpretation ${pending ? 'pending' : ''}`}>
+    <span>Interpretación del equipo</span>
+    {pending
+      ? <><p>Pendiente de redacción en <code>frontend/src/content/hallazgos/{id}.md</code>.</p>
+        <Markdown text={text.split('\n').filter(line => !line.startsWith('PENDIENTE')).join('\n')} /></>
+      : <Markdown text={text} />}
+  </div>
+}
+
+export function Pipeline({ steps }) {
+  return <ol className="pipeline">{steps.map(([label, engine, detail], i) => <li key={i}>
+    <span className={`engine ${engine === 'Spark' ? 'spark' : 'local'}`}>{engine}</span>
+    <strong>{label}</strong>{detail && <small>{detail}</small>}
+  </li>)}</ol>
+}
+
+export function FindingModule({ id, part, question, pipeline, children }) {
+  return <section className="finding" id={id}>
+    <div className="finding-head"><span className="part-tag">{part}</span><h2>{question}</h2></div>
+    {pipeline && <Pipeline steps={pipeline} />}
+    {children}
+    <Interpretation id={id} />
+  </section>
+}
+
+export function CodeCompare({ snippet }) {
+  if (!snippet) return null
+  return <div className="code-compare">{['DataFrame', 'RDD'].map(engine => snippet[engine] && <div key={engine}>
+    <b>{engine} · {snippet[engine].lines} líneas</b><pre>{snippet[engine].code}</pre>
+  </div>)}</div>
+}
+
+export function SourceFooter({ meta }) {
+  const source = meta?.source || {}
+  return <footer className="source-footer">
+    Fuente: Registro de Datos OCDS del Organismo Especializado para las Contrataciones Públicas Eficientes (OECE), {' '}
+    <a href={source.page || 'https://data.open-contracting.org/es/publication/135'} target="_blank" rel="noreferrer">data.open-contracting.org/es/publication/135</a>.
+    {' '}Licencia {source.license || 'CC BY 4.0'}.{source.published_at && ` Publicación del ${source.published_at}`}{source.downloaded_at && `, descargada el ${source.downloaded_at.slice(0, 10)}`}.
+    {' '}Las cifras son señales exploratorias: ninguna similitud, concentración o regla prueba por sí sola una irregularidad.
+  </footer>
+}
+
+export function StaticNotice({ data }) {
+  if (!data?.static_ignored?.length) return null
+  return <div className="callout"><strong>Versión publicada</strong><p>Los filtros {data.static_ignored.join(', ')} solo funcionan en la versión local con API; se muestran los resultados sin ellos.</p></div>
+}

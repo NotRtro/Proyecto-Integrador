@@ -1,57 +1,54 @@
-import { ArrowRight, CheckCircle2, Gauge, Layers3, ShieldCheck } from 'lucide-react'
+import { ArrowRight, ShieldCheck } from 'lucide-react'
 import { api, integer, money, percent } from '../api'
 import { Card, DataTable, ErrorState, ExecutiveLine, Loading, SectionHeader, Stat, Technical } from '../components'
 import { useAsync, useMeta } from '../hooks'
 
-export default function Overview() {
+export default function Overview({ navigate }) {
   const { data, loading, error } = useAsync(() => api('/api/overview'), [])
   const meta = useMeta()
   if (error || meta.error) return <ErrorState error={error || meta.error} />
   if (loading || meta.loading) return <Loading />
-  const period = meta.data.period
   const q = data.quality
+  const period = meta.data.period
   const yearly = data.yearly.map(row => ({ ...row, period: String(row.year) }))
+  const local = data.buyer_hhi.filter(r => r.buyer_level === 'local').sort((a, b) => a.year - b.year)
+  const consortia = q.suppliers?.types?.consorcio
+  const singleRates = data.single_bidder.filter(r => r.year === 'Todos')
+  const lsh = data.full_corpus_lsh || {}
+  const questions = [
+    ['q1', 'Q1 · Concentración', '¿Qué tan concentrada está la adjudicación en pocos proveedores dentro de cada entidad y departamento, y cambió entre años?',
+      local.length > 1 ? `En municipalidades, las de concentración alta pasan de ${percent(local[0].high_share)} a ${percent(local.at(-1).high_share)}.` : ''],
+    ['q2', 'Q2 · Competencia', '¿Qué características del proceso se asocian a tener un solo postor?',
+      singleRates.length ? `Tasa de postor único por nivel de gobierno: de ${percent(Math.min(...singleRates.map(r => r.single_bidder_rate)))} a ${percent(Math.max(...singleRates.map(r => r.single_bidder_rate)))}.` : ''],
+    ['q3', 'Q3 · Requerimientos similares', '¿Hay requerimientos casi idénticos convocados repetidamente por una entidad, o por muchas a la vez?',
+      lsh.documents ? `LSH comparó ${integer(lsh.candidate_pairs)} candidatos en lugar de ${integer(lsh.possible_pairs)} pares y verificó ${integer(lsh.similar_pairs)} casi idénticos.` : ''],
+  ]
   return <>
-    <SectionHeader eyebrow="Panorama nacional" title="Contrataciones públicas, explicadas con evidencia"
-      description={`Una lectura ejecutiva de ${integer(data.quality.selected_processes)} procesos y cinco experimentos de minería de datos. Cada hallazgo puede abrirse para revisar cómo fue calculado.`}
-      question={`¿Qué aprendemos de las contrataciones publicadas en ${period}?`} />
+    <SectionHeader eyebrow="Contrataciones públicas del Perú" title="Concentración, competencia y requerimientos repetidos"
+      description={`Minería de datos masivos sobre ${integer(q.selected_processes)} procesos de contratación publicados por el OECE en estándar OCDS (${period}). Tres preguntas de interés guían el uso de cada técnica del curso.`}
+      question={`¿Qué revelan los datos abiertos de contratación ${period} sobre concentración, competencia y repetición de compras?`} />
     <div className="hero-panel">
-      <div><span className="kicker">Cobertura analítica validada</span><h2>{integer(q.selected_processes)} procesos</h2><p>Convocatorias efectivas entre {q.min_date} y {q.max_date}. Los registros históricos fuera del periodo fueron separados.</p></div>
-      <div className="hero-seal"><ShieldCheck /><strong>{Object.values(data.validation.checks).filter(Boolean).length}</strong><span>controles superados</span></div>
+      <div><span className="kicker">Cobertura analítica</span><h2>{integer(q.selected_processes)} procesos</h2><p>Convocatorias entre {q.min_date} y {q.max_date}, a partir de {integer(q.raw_records)} registros OCDS (versión más reciente de cada proceso).</p></div>
+      <div className="hero-seal"><ShieldCheck /><strong>{Object.values(data.validation.checks).filter(Boolean).length}/{Object.keys(data.validation.checks).length}</strong><span>controles automáticos superados</span></div>
+    </div>
+    <div className="question-grid three">{questions.map(([id, title, text, evidence]) =>
+      <button key={id} className="question-card" onClick={() => navigate(id)}>
+        <strong>{title}</strong><p>{text}</p>{evidence && <small>{evidence}</small>}<ArrowRight size={18} />
+      </button>)}
     </div>
     <div className="stat-grid four">
-      <Stat label="Registros originales" value={integer(q.raw_records)} note={`${meta.data.source.files} archivos JSONL`} />
-      <Stat label="Procesos del periodo" value={integer(q.selected_processes)} note={period} tone="green" />
-      <Stat label="Reglas interpretadas" value={data.selected_rules} note="Soporte y lift validados" tone="orange" />
-      <Stat label="Estado del pipeline" value={data.run.status === 'complete' ? 'Completo' : data.run.status} note="Última ejecución" tone="navy" />
+      <Stat label="Monto adjudicado" value={money(yearly.reduce((s, r) => s + (r.award_amount_pen || 0), 0))} note={period} />
+      <Stat label="Consorcios" value={consortia ? percent(consortia.amount_share) : '—'} note="del monto atribuido a proveedores" tone="orange" />
+      <Stat label="Mejor LSH (muestra)" value={`F1 ${Number(data.best_lsh.f1).toFixed(2)}`} note={`k=${data.best_lsh.hashes}, b=${data.best_lsh.bands}, r=${data.best_lsh.rows}`} tone="green" />
+      <Stat label="HNSW frente a exacta" value={`${Number(data.best_ann.speedup).toFixed(0)}×`} note={`recall@10 ${percent(data.best_ann.recall_at_10)}`} tone="navy" />
     </div>
-    <div className="two-col executive-grid">
-      <Card title="Evolución del volumen" subtitle="Procesos y montos convocados por año">
-        <ExecutiveLine data={yearly} x="period" lines={['processes']} formatter={integer} />
-      </Card>
-      <Card title="Qué aportan las aproximaciones" subtitle="Resultados destacados de la evaluación">
-        <div className="finding-list">
-          <div><Gauge /><p><strong>LSH recupera candidatos similares</strong><span>Mejor F1 observado: {Number(data.best_lsh.f1).toFixed(3)}, con recall {percent(data.best_lsh.recall)}.</span></p></div>
-          <div><Layers3 /><p><strong>HNSW acelera consultas vectoriales</strong><span>{Number(data.best_ann.speedup).toFixed(1)}× en su configuración destacada, con recall@10 de {percent(data.best_ann.recall_at_10)}.</span></p></div>
-          <div><CheckCircle2 /><p><strong>Referencias exactas conservadas</strong><span>Las técnicas aproximadas se compararon con Jaccard, coseno y conteos exactos.</span></p></div>
-        </div>
-      </Card>
+    <div className="two-col">
+      <Card title="Procesos por año" subtitle="Convocatorias del periodo (Spark SQL)"><ExecutiveLine data={yearly} x="period" lines={['processes']} formatter={integer} /></Card>
+      <Card title="Monto convocado y adjudicado por año" subtitle="Soles; montos extranjeros convertidos con tasas OECE"><ExecutiveLine data={yearly} x="period" lines={['tender_amount_pen', 'award_amount_pen']} formatter={money} /></Card>
     </div>
-    <Card title="La historia en cinco preguntas" subtitle="El recorrido ejecutivo del observatorio">
-      <div className="question-grid">
-        {[
-          ['01', 'Concentración', '¿Dónde se concentra el monto y cómo cambia por año?'],
-          ['02', 'Similitud', '¿Qué procesos comparten descripciones y qué errores introduce LSH?'],
-          ['03', 'Vecinos', '¿Cuánto acelera HNSW la búsqueda y qué recall conserva?'],
-          ['04', 'Flujos', '¿Cuánta memoria ahorran Bloom, CMS y DGIM?'],
-          ['05', 'Asociaciones', '¿Qué características aparecen juntas con mayor frecuencia?'],
-        ].map(([n, title, text]) => <div key={n}><span>{n}</span><strong>{title}</strong><p>{text}</p><ArrowRight size={18} /></div>)}
-      </div>
-    </Card>
     <Technical title="Detalle técnico de la ejecución">
-      <div className="detail-grid"><div><b>Política temporal</b><p>{q.date_policy}</p></div><div><b>Conversión monetaria</b><p>{q.currency_policy}</p></div><div><b>Asignación a proveedores</b><p>{q.supplier_allocation}</p></div><div><b>Datos ausentes</b><p>{q.missing_amount_policy}</p></div><div><b>Valores extremos</b><p>{q.outlier_policy}</p></div><div><b>Categorías ausentes</b><p>{q.categorical_policy}</p></div></div>
-      <h4>Totales anuales producidos con Spark SQL</h4><DataTable rows={data.yearly} />
-      <h4>Etapas y tiempo de ejecución</h4><DataTable rows={data.run.stages} />
+      <h4>Etapas del pipeline y duración</h4><DataTable rows={data.run.stages} />
+      <h4>Controles de validación</h4><DataTable rows={Object.entries(data.validation.checks).map(([control, ok]) => ({ control, ok }))} />
     </Technical>
   </>
 }
