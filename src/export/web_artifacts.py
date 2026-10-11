@@ -15,6 +15,7 @@ import pandas as pd
 
 from src.common import now, save_json
 from src.config import ARTIFACTS, PROCESSED
+from src.export import decisions
 
 REQUIRED = [
     'metadata/source_manifest.json',
@@ -118,6 +119,8 @@ def analytic_checks():
 
 
 def run():
+    # Tabla de decisiones de volumen con cifras de esta corrida (docs/DecisionesTecnicas.md).
+    save_json('metadata/data_decisions.json', decisions.build())
     missing = [p for p in REQUIRED if not (ARTIFACTS / p).is_file()]
     if missing:
         raise RuntimeError(f'Faltan artefactos: {missing}')

@@ -88,9 +88,18 @@ def experiment(name, artifacts, measure):
         print(f'  experimento {name}: {entry["last_status"]}', flush=True)
         measured = False
     else:
+        start = time.perf_counter()
         measure()
-        entry = dict(measured_at=now(), profile=run_profile(), code_version=os.getenv('CODE_VERSION', 'uncommitted'),
-                     artifacts=artifacts, last_run=now(), last_status='medido')
+        entry = dict(
+            measured_at=now(),
+            seconds=round(time.perf_counter() - start, 1),
+            profile=run_profile(),
+            code_version=os.getenv('CODE_VERSION', 'uncommitted'),
+            artifacts=artifacts,
+            last_run=now(),
+            last_status='medido',
+        )
+
         measured = True
     registry[name] = entry
     save_json(EXPERIMENTS_REGISTRY, registry)
