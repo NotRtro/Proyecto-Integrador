@@ -22,10 +22,12 @@ export default function Overview({ navigate }) {
       singleRates.length ? `Tasa de postor único por nivel de gobierno: de ${percent(Math.min(...singleRates.map(r => r.single_bidder_rate)))} a ${percent(Math.max(...singleRates.map(r => r.single_bidder_rate)))}.` : ''],
     ['q3', 'Q3 · Requerimientos similares', '¿Hay requerimientos casi idénticos convocados repetidamente por una entidad, o por muchas a la vez?',
       lsh.documents ? `LSH comparó ${integer(lsh.candidate_pairs)} candidatos en lugar de ${integer(lsh.possible_pairs)} pares y verificó ${integer(lsh.similar_pairs)} casi idénticos.` : ''],
+    ['q4', 'Análisis complementario · Señales de riesgo', '¿Dónde se concentran las señales de riesgo y tienden a aparecer juntas en un mismo proceso?',
+      'Cuatro señales por proceso, con su coincidencia y las entidades públicas donde más aparecen.'],
   ]
   return <>
     <SectionHeader eyebrow="Contrataciones públicas del Perú" title="Concentración, competencia y requerimientos repetidos"
-      description={`Minería de datos masivos sobre ${integer(q.selected_processes)} procesos de contratación publicados por el OECE en estándar OCDS (${period}). Tres preguntas de interés guían el uso de cada técnica del curso.`}
+      description={`Minería de datos masivos sobre ${integer(q.selected_processes)} procesos de contratación publicados por el OECE en estándar OCDS (${period}). Tres preguntas de interés guían el uso de cada técnica del curso y un análisis complementario cruza sus resultados.`}
       question={`¿Qué revelan los datos abiertos de contratación ${period} sobre concentración, competencia y repetición de compras?`} />
     <div className="hero-panel">
       <div><span className="kicker">Cobertura analítica</span><h2>{integer(q.selected_processes)} procesos</h2><p>Convocatorias entre {q.min_date} y {q.max_date}, a partir de {integer(q.raw_records)} registros OCDS (versión más reciente de cada proceso).</p></div>

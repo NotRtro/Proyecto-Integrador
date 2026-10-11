@@ -277,6 +277,33 @@ def competition(dimension: str = "modality", year: str = "Todos"):
     return safe(build)
 
 
+@app.get("/api/integrity")
+def integrity(dimension: str = "category"):
+    """Q4: señales de riesgo por proceso, dónde se concentran y si aparecen juntas."""
+
+    def build():
+        by_dimension = frame("integrity/by_dimension.csv")
+        buyers = frame("integrity/buyers.csv")
+        signals = sorted(c[:-5] for c in buyers.columns if c.endswith("_rate"))
+        # Por señal, las entidades con mayor proporción entre las que tienen suficientes procesos evaluables.
+        top = {"any": records(buyers.sort_values("with_signal_share", ascending=False).head(15))}
+        for signal in signals:
+            enough = buyers[buyers[f"{signal}_evaluable"] >= 50]
+            top[signal] = records(enough.sort_values(f"{signal}_rate", ascending=False).head(15))
+        return {
+            "dimensions": sorted(by_dimension["dimension"].unique().tolist()),
+            "dimension": dimension,
+            "summary": records(frame("integrity/summary.csv")),
+            "by_dimension": records(by_dimension[by_dimension["dimension"] == dimension]),
+            "cooccurrence": records(frame("integrity/cooccurrence.csv")),
+            "counts": records(frame("integrity/count_distribution.csv")),
+            "buyers": top,
+            "methodology": document("integrity/methodology.json"),
+        }
+
+    return safe(build)
+
+
 @app.get("/api/similarity")
 def similarity():
     """Parte II y Q3: rejilla LSH, error de MinHash, curva S, corpus completo y repetidos."""

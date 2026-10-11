@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  Activity, BarChart3, Blocks, BookOpenCheck, Building2, DatabaseZap, FlaskConical, Menu, SearchCode, Users, X,
+  Activity, BarChart3, Blocks, BookOpenCheck, Building2, DatabaseZap, FlaskConical, Menu, SearchCode, ShieldAlert, Users, X,
 } from 'lucide-react'
 import Overview from './pages/Overview'
 import Data from './pages/Data'
@@ -8,6 +8,7 @@ import Eda from './pages/Eda'
 import Concentration from './pages/Concentration'
 import Competition from './pages/Competition'
 import Similarity from './pages/Similarity'
+import Signals from './pages/Signals'
 import Lab from './pages/Lab'
 import Discussion from './pages/Discussion'
 import { SourceFooter } from './components'
@@ -21,6 +22,7 @@ const pages = [
   ['q1', 'Q1 · Concentración', Building2, Concentration, 'Partes I y IV'],
   ['q2', 'Q2 · Competencia', Users, Competition, 'Partes I, IV y V'],
   ['q3', 'Q3 · Requerimientos similares', SearchCode, Similarity, 'Partes II y III'],
+  ['q4', 'Q4 · Señales de riesgo', ShieldAlert, Signals, 'Partes I y II'],
   ['laboratorio', 'Laboratorio de técnicas', FlaskConical, Lab, 'Partes II a V'],
   ['discusion', 'Discusión', BookOpenCheck, Discussion, 'Parte VI'],
 ]

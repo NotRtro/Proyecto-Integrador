@@ -65,6 +65,7 @@ def specs():
             grid(dimension=competition['dimensions'], year=['Todos'] + years[1:]),
             ['dimension', 'year'],
         ),
+        'integrity': (main.integrity, grid(dimension=main.integrity()['dimensions']), ['dimension']),
         'similarity': (main.similarity, [{}], []),
         'similarity/pairs': (
             main.similarity_pairs,

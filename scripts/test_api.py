@@ -50,6 +50,11 @@ assert all(0 <= r["hhi"] <= 10000 for r in concentration["market"])
 competition = get("/api/competition", {"dimension": "modality"})
 assert competition["rates"] and all(between(r["single_bidder_rate"]) for r in competition["rates"])
 
+integrity = get("/api/integrity", {"dimension": "modality"})
+assert integrity["by_dimension"] and all(between(r["rate"]) for r in integrity["summary"])
+assert all(r["flagged"] <= r["evaluable"] <= r["processes"] for r in integrity["summary"])
+assert sum(r["processes"] for r in integrity["counts"]) == meta["selected_processes"]
+
 similarity = get("/api/similarity")
 assert similarity["grid"] and similarity["minhash_error"]
 assert all(between(r["precision"]) and between(r["recall"]) for r in similarity["grid"])
@@ -73,4 +78,4 @@ assert all(r["support"] >= 0.02 and r["confidence"] >= 0.5 for r in association[
 discussion = get("/api/discussion")
 assert discussion["run"]["status"] == "complete"
 
-print(f"PASS API: 15 endpoints verificados para {meta['period']}")
+print(f"PASS API: 16 endpoints verificados para {meta['period']}")

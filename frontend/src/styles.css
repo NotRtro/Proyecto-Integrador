@@ -48,3 +48,5 @@ main { margin-left:254px; padding: 0 46px 80px; max-width: 1660px; }
 
 .play { align-self: end; border: 0; border-radius: 10px; padding: 10px 16px; background: #167c80; color: #fff; font-weight: 600; cursor: pointer; }
 .play:hover { background: #10656a; }
+.scope{color:var(--muted);font-size:13px;line-height:1.5;margin:-8px 0 18px}
+.question-grid.three>:nth-child(4){grid-column:1/-1}

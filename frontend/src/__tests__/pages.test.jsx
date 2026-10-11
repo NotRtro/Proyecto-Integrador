@@ -8,7 +8,7 @@ import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
 
 const DATA = path.resolve(__dirname, '../../public/data')
 const hasData = fs.existsSync(path.join(DATA, 'meta', 'index.json'))
-const PAGES = ['Overview', 'Data', 'Eda', 'Concentration', 'Competition', 'Similarity', 'Lab', 'Discussion',
+const PAGES = ['Overview', 'Data', 'Eda', 'Concentration', 'Competition', 'Similarity', 'Signals', 'Lab', 'Discussion',
   'lab/AnnLab', 'lab/StreamLab', 'lab/RulesLab']
 
 describe.skipIf(!hasData)('páginas con datos exportados', () => {
