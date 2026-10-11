@@ -29,14 +29,15 @@ from src.config import PROCESSED, YEARS, spark_session
 from src.ingestion.json_records import decode_line
 from src.ingestion.validate_files import input_files
 from src.processing.model import flatten
+from src.processing.text_features import DOMAIN_STOPWORD_DF, SHINGLE_WIDTH, domain_stopwords, shingles_column
 
 BASE = 'ocid source_file release_date effective_date date_source year month'.split()
 FIELDS = {
     'processes': BASE + (
-        'buyer_id buyer_name buyer_level department category method method_details tender_amount_pen tender_amount_original '
-        'currency tender_conversion_method tender_exchange_rate negative_amount extreme_amount award_amount_pen '
-        'award_converted_count award_unconverted_count bidders competition amount_band text normalized_text '
-        'shingles item_count award_count supplier_count').split(),
+        'buyer_id buyer_name buyer_level department category method method_details tender_code tender_amount_pen '
+        'tender_amount_original currency tender_conversion_method tender_exchange_rate negative_amount extreme_amount '
+        'award_amount_pen award_converted_count award_unconverted_count bidders competition amount_band text '
+        'normalized_text item_count award_count supplier_count').split(),
     'items': BASE + ('item_id description classification quantity amount_original amount_pen currency '
                      'conversion_method exchange_rate conversion_reference_date').split(),
     'awards': BASE + ('award_id amount_original amount_pen currency conversion_method exchange_rate '
@@ -48,7 +49,7 @@ FIELDS = {
 }
 CHILDREN = ['items', 'awards', 'suppliers', 'contracts']
 # Columnas calculadas en Spark después del parseo (no salen de `flatten`).
-DERIVED = {'suppliers': ['supplier_name_original', 'supplier_type']}
+DERIVED = {'processes': ['shingles'], 'suppliers': ['supplier_name_original', 'supplier_type']}
 SUPPLIER_TYPES = ['persona_natural', 'persona_juridica', 'consorcio', 'extranjero', 'otro']
 GRAINS = {'items': ['ocid', 'item_id'], 'awards': ['ocid', 'award_id'],
           'suppliers': ['ocid', 'award_id', 'supplier_id'], 'contracts': ['ocid', 'contract_id']}
@@ -88,7 +89,9 @@ def staging_schema():
     """Una fila por registro: columnas del proceso + un array de structs por tabla hija."""
     children = [StructField(t, ArrayType(StructType([StructField(k, field_type(k), True) for k in child_fields(t)])), True)
                 for t in CHILDREN]
-    return StructType(list(schema('processes').fields) + children)
+    # Solo las columnas que produce `flatten`; las derivadas (DERIVED) se calculan después en Spark.
+    process = [StructField(k, field_type(k), True) for k in FIELDS['processes']]
+    return StructType(process + children)
 
 
 def parse(row):
@@ -344,7 +347,14 @@ def run(spark=None):
     for name in ['items', 'awards', 'contracts']:
         tables[name] = apply_historical_rates(tables[name], rates)
     tables['suppliers'] = normalize_suppliers(allocate_to_suppliers(tables['suppliers'], tables['awards']))
-    selected = recompute_award_totals(selected_rows.select(*FIELDS['processes']), tables['awards']).cache()
+    with timer.step('stopwords de dominio'):
+        stopwords = domain_stopwords(selected_rows)
+        save_json('metadata/domain_stopwords.json', dict(
+            threshold=DOMAIN_STOPWORD_DF, shingle_width=SHINGLE_WIDTH, documents=selected_rows.count(), terms=stopwords))
+    selected = (recompute_award_totals(selected_rows.select(*FIELDS['processes']), tables['awards'])
+                .withColumn('shingles', shingles_column([t['term'] for t in stopwords]))
+                .select(*output_fields('processes'))
+                .cache())
     with timer.step('escritura processes'):
         write_partitioned(selected, 'processes')
     for name, df in tables.items():

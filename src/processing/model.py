@@ -2,7 +2,7 @@ import json
 import math
 from datetime import datetime
 from src.processing.entity_level import buyer_level
-from src.processing.normalize_text import normalize_text, shingles
+from src.processing.normalize_text import normalize_text
 
 
 def effective_date(record):
@@ -73,7 +73,11 @@ def flatten(record, source):
     department = normalize_text(address.get('department') or address.get('region')).upper() or None
     items = t.get('items') or []
     awards = record.get('awards') or []
-    text = ' '.join(str(x) for x in [t.get('title') or '', t.get('description') or ''] + [i.get('description') or '' for i in items] + [(i.get('classification') or {}).get('description') or '' for i in items])
+    # El título OCDS del OECE es la nomenclatura del proceso (AS-SM-12-2024-MDCH/CS-1), no su
+    # objeto: se guarda como tender_code y se excluye del texto usado para similitud.
+    text = ' '.join(str(x) for x in [t.get('description') or '']
+                    + [i.get('description') or '' for i in items]
+                    + [(i.get('classification') or {}).get('description') or '' for i in items])
     tender_value = t.get('value') or {}
     amount, tender_conversion_method, tender_exchange_rate = converted_amount(tender_value)
     tender_original = number(tender_value.get('amount'))
@@ -85,7 +89,23 @@ def flatten(record, source):
     bidders = number(t.get('numberOfTenderers'))
     competition = 'sin dato' if bidders is None or bidders < 1 else 'uno' if bidders == 1 else 'dos a tres' if bidders <= 3 else 'cuatro o mas'
     base = dict(ocid=record.get('ocid'), source_file=source, release_date=record.get('date') or '', effective_date=date, date_source=date_source, year=int(date[:4]) if date else None, month=int(date[5:7]) if date else None)
-    p = dict(base, buyer_id=buyer.get('id'), buyer_name=buyer.get('name'), buyer_level=buyer_level(buyer.get('name')), department=department, category=t.get('mainProcurementCategory'), method=t.get('procurementMethod'), method_details=t.get('procurementMethodDetails'), tender_amount_pen=amount if amount is None or amount >= 0 else None, tender_amount_original=tender_original, currency=tender_currency, tender_conversion_method=tender_conversion_method, tender_exchange_rate=tender_exchange_rate, negative_amount=amount is not None and amount < 0, extreme_amount=amount is not None and amount > 1000000000, award_amount_pen=sum(valid) if valid else None, award_converted_count=sum(method == 'tender_implied_rate' for _, method, _ in converted_awards), award_unconverted_count=sum(a is None for a in amounts), bidders=bidders, competition=competition, amount_band=amount_band(amount), text=text, normalized_text=normalize_text(text), shingles=shingles(text), item_count=len(items), award_count=len(awards), supplier_count=len({s.get('id') for a in awards for s in a.get('suppliers', []) if s.get('id')}))
+    p = dict(
+        base,
+        buyer_id=buyer.get('id'), buyer_name=buyer.get('name'), buyer_level=buyer_level(buyer.get('name')),
+        department=department, category=t.get('mainProcurementCategory'), method=t.get('procurementMethod'),
+        method_details=t.get('procurementMethodDetails'), tender_code=t.get('title'),
+        tender_amount_pen=amount if amount is None or amount >= 0 else None, tender_amount_original=tender_original,
+        currency=tender_currency, tender_conversion_method=tender_conversion_method,
+        tender_exchange_rate=tender_exchange_rate, negative_amount=amount is not None and amount < 0,
+        extreme_amount=amount is not None and amount > 1000000000,
+        award_amount_pen=sum(valid) if valid else None,
+        award_converted_count=sum(method == 'tender_implied_rate' for _, method, _ in converted_awards),
+        award_unconverted_count=sum(a is None for a in amounts),
+        bidders=bidders, competition=competition, amount_band=amount_band(amount),
+        text=text, normalized_text=normalize_text(text),
+        item_count=len(items), award_count=len(awards),
+        supplier_count=len({s.get('id') for a in awards for s in a.get('suppliers', []) if s.get('id')}),
+    )
     tables = {'processes': [p], 'items': [], 'awards': [], 'suppliers': [], 'contracts': []}
     for idx, i in enumerate(items):
         item_value = i.get('totalValue') or {}

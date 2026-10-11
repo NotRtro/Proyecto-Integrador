@@ -32,6 +32,24 @@ def test_ocds_to_partitioned_parquet(tmp_path,monkeypatch):
 
 
 @pytest.mark.integration
+def test_domain_stopwords_and_shingles():
+    from src.config import spark_session
+    from src.processing.text_features import domain_stopwords, shingles_column
+    spark=spark_session()
+    try:
+        texts=['servicio limpieza local','servicio agua potable','servicio agua potable rural','cemento']
+        df=spark.createDataFrame([(t,) for t in texts],'normalized_text string')
+        stop=domain_stopwords(df,.5)
+        # "servicio" aparece en 3 de 4 documentos (75 % > 50 %); "agua" en 2 de 4 (no supera).
+        assert [t['term'] for t in stop]==['servicio'] and stop[0]['document_frequency']==.75
+        out=[r.s for r in df.select(shingles_column(['servicio']).alias('s')).collect()]
+        assert out[0]==['limpieza local']
+        assert out[2]==['agua potable','potable rural']
+        assert out[3]==['cemento']
+    finally: spark.stop()
+
+
+@pytest.mark.integration
 def test_normalize_suppliers_canonical_name_and_type():
     from src.config import spark_session
     from src.processing import build_processes as build

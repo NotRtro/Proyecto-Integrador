@@ -1,5 +1,5 @@
 import random
-from src.processing.normalize_text import normalize_text,shingles
+from src.processing.normalize_text import normalize_text
 from src.processing.model import effective_date,amount_pen,converted_amount,flatten
 from src.part2.exact_jaccard import jaccard
 from src.part2.minhash_lsh import signature
@@ -11,7 +11,15 @@ from src.part5.apriori import apriori
 
 def test_normalization():
     assert normalize_text('Adquisición de ÚTILES, para la oficina')=='adquisicion utiles oficina'
-    assert shingles('a')==[]
+    assert normalize_text('a') == ''
+
+
+def test_text_excludes_tender_code():
+    # El título es la nomenclatura del proceso: va a tender_code, no al texto de similitud.
+    record={'ocid':'x','tender':{'title':'AS-SM-12-2024-MDCH/CS-1','description':'Compra de cemento','items':[{'description':'Cemento portland'}]}}
+    process=flatten(record,'f')['processes'][0]
+    assert process['tender_code']=='AS-SM-12-2024-MDCH/CS-1'
+    assert 'sm' not in process['normalized_text'].split() and process['normalized_text']=='compra cemento cemento portland'
 
 def test_dates_and_currency():
     assert effective_date({'date':'2025-01-01','tender':{'datePublished':'2014-01-30T19:07:00-05:00'}})[0]=='2014-01-30'
