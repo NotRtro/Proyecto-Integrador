@@ -14,6 +14,7 @@ Artefactos (artifacts/similarity/):
     lsh_parameter_grid.csv, s_curve_observed.csv, similar_pairs.csv, documents.csv
     full_corpus_summary.json, template_groups.csv        LSH sobre todo el corpus (II-02)
     repeated_requirements.parquet, repeated_summary.csv, repeated_top_buyers.csv (Q3)
+    lsh_groups.csv, lsh_groups_summary.json  grupos de casi idénticos con etiqueta (Q3)
     case_candidates.json, methodology.json
 """
 
@@ -25,7 +26,7 @@ from src.common import StepTimer, save_csv, save_json
 from src.common import features as read_features
 from src.common import processes as read_processes
 from src.config import ARTIFACTS, SAMPLE, SEED, spark_session
-from src.part2 import full_corpus, repeated
+from src.part2 import full_corpus, groups, repeated
 from src.part2.evaluation import ERROR_HASHES, MAX_HASHES, THRESHOLDS, evaluate
 from src.processing.text_features import DOMAIN_STOPWORD_DF, SHINGLE_WIDTH
 
@@ -119,6 +120,11 @@ def run(spark):
                 cases=repeated.case_candidates(pairs, features),
             ),
         )
+    with timer.step('grupos y etiquetas de LSH (Q3)'):
+        stopwords = json.loads((ARTIFACTS / 'metadata/domain_stopwords.json').read_text(encoding='utf-8'))
+        lsh_groups, groups_summary = groups.build(pairs, features, {t['term'] for t in stopwords['terms']})
+        save_csv('similarity/lsh_groups.csv', lsh_groups)
+        save_json('similarity/lsh_groups_summary.json', groups_summary)
         pairs.unpersist()
 
     # Compatibilidad con la API actual: los casos interpretados los escribe el equipo en

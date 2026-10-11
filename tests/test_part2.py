@@ -129,3 +129,15 @@ def test_repeated_requirements_classification():
         assert top == []  # en <= 30 días solo hay una reconvocatoria y un par del mismo procedimiento
     finally:
         spark.stop()
+
+
+def test_groups_components_and_label():
+    from src.part2 import groups
+
+    found = groups.components([('a', 'b'), ('b', 'c'), ('x', 'y')])
+    assert found['a'] == found['b'] == found['c'] and found['x'] == found['y'] and found['a'] != found['x']
+    texts = ['tercero supervisor ambiental oefa', 'tercero supervisor ambiental campo', 'tercero supervisor ambiental']
+    df = {'tercero': 10, 'supervisor': 50, 'ambiental': 400, 'oefa': 5, 'campo': 300, 'servicio': 9000}
+    label = groups.label(texts, df, 10000, stopwords={'servicio'})
+    assert label.split(' · ')[0] == 'tercero'  # la palabra más distintiva del grupo va primero
+    assert 'oefa' not in label  # aparece en menos de la mitad del grupo
