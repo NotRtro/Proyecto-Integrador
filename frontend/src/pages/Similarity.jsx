@@ -10,8 +10,9 @@ export default function Similarity() {
   const active = config || base.data?.selected?.[0]?.config || ''
   const result = useAsync(() => active ? api('/api/similarity', { config: active, status }) : Promise.resolve(null), [active, status])
   const configs = useMemo(() => base.data?.grid?.map(r => r.config) || [], [base.data])
-  if (base.loading || !active || result.loading || !result.data) return <Loading />
+  // El error se revisa primero: si la carga base falla, active queda vacío y la página quedaría cargando.
   if (base.error || result.error) return <ErrorState error={base.error || result.error} />
+  if (base.loading || !active || result.loading || !result.data) return <Loading />
   const row = result.data.selected[0] || base.data.selected[0]
   const chart = base.data.grid.filter(r => r.threshold === row.threshold).map(r => ({ ...r, label: `${r.hashes}h · ${r.bands}b` })).sort((a, b) => b.f1 - a.f1).slice(0, 12)
   return <>

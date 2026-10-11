@@ -11,6 +11,7 @@ import Ann from './pages/Ann'
 import Streaming from './pages/Streaming'
 import Association from './pages/Association'
 import Discussion from './pages/Discussion'
+import { useMeta } from './hooks'
 
 const pages = [
   ['overview', 'Resumen ejecutivo', BarChart3],
@@ -34,6 +35,7 @@ export default function App() {
   const [page, setPage] = useState(content[initialPage] ? initialPage : 'overview')
   const [open, setOpen] = useState(false)
   const Page = content[page]
+  const meta = useMeta()
   useEffect(() => {
     const sync = () => { const target = window.location.hash.slice(1); if (content[target]) setPage(target) }
     window.addEventListener('hashchange', sync)
@@ -45,7 +47,7 @@ export default function App() {
     <aside className={open ? 'open' : ''}>
       <div className="brand"><div className="brand-mark"><Blocks /></div><div><strong>Observatorio</strong><span>Contratación pública</span></div></div>
       <nav>{pages.map(([id, label, Icon]) => <button className={page === id ? 'active' : ''} onClick={() => navigate(id)} key={id}><Icon size={19} /><span>{label}</span></button>)}</nav>
-      <div className="sidebar-note"><span className="live-dot" />Datos procesados <strong>2023–2025</strong><small>Fuente: OECE · OCDS</small></div>
+      <div className="sidebar-note"><span className="live-dot" />Datos procesados <strong>{meta.data?.period || '…'}</strong><small>Fuente: OECE · OCDS</small></div>
     </aside>
     <main><div className="topbar"><div><span className="live-dot" />Resultados precalculados</div></div><Page /></main>
   </div>

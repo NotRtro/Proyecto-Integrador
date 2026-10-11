@@ -1,13 +1,15 @@
 import { api, integer, percent } from '../api'
 import { Card, DataTable, ErrorState, ExecutiveBar, Loading, SectionHeader, Stat, Technical } from '../components'
-import { useAsync } from '../hooks'
+import { useAsync, useMeta } from '../hooks'
 
 export default function Quality() {
   const { data, loading, error } = useAsync(() => api('/api/quality'), [])
-  if (loading) return <Loading />
-  if (error) return <ErrorState error={error} />
+  const meta = useMeta()
+  if (error || meta.error) return <ErrorState error={error || meta.error} />
+  if (loading || meta.loading) return <Loading />
+  const years = meta.data.years.map(String)
   const q = data.quality
-  const periodCoverage = Object.values(data.coverage.filter(row => ['2023', '2024', '2025'].includes(String(row.effective_year))).reduce((acc, row) => {
+  const periodCoverage = Object.values(data.coverage.filter(row => years.includes(String(row.effective_year))).reduce((acc, row) => {
     const year = String(row.effective_year)
     acc[year] = acc[year] || { effective_year: year, count: 0 }
     acc[year].count += row.count

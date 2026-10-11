@@ -8,8 +8,9 @@ export default function Ann() {
   const [query, setQuery] = useState(''); const [config, setConfig] = useState('exact'); const [k, setK] = useState('5')
   useEffect(() => { if (!query && initial.data?.query?.ocid) setQuery(initial.data.query.ocid) }, [initial.data, query])
   const result = useAsync(() => query ? api('/api/ann', { query, config, k }) : Promise.resolve(null), [query, config, k])
-  if (initial.loading || !query || result.loading || !result.data) return <Loading />
+  // El error se revisa primero: si /api/ann falla, query nunca se asigna y la página quedaría cargando.
   if (initial.error || result.error) return <ErrorState error={initial.error || result.error} />
+  if (initial.loading || !query || result.loading || !result.data) return <Loading />
   const d = result.data; const selected = d.grid.find(r => r.config === config)
   const configs = ['exact', ...initial.data.grid.map(r => r.config)]
   const speed = [...initial.data.grid].sort((a, b) => b.speedup - a.speedup).slice(0, 8)

@@ -1,25 +1,27 @@
 import { ArrowRight, CheckCircle2, Gauge, Layers3, ShieldCheck } from 'lucide-react'
 import { api, integer, money, percent } from '../api'
 import { Card, DataTable, ErrorState, ExecutiveLine, Loading, SectionHeader, Stat, Technical } from '../components'
-import { useAsync } from '../hooks'
+import { useAsync, useMeta } from '../hooks'
 
 export default function Overview() {
   const { data, loading, error } = useAsync(() => api('/api/overview'), [])
-  if (loading) return <Loading />
-  if (error) return <ErrorState error={error} />
+  const meta = useMeta()
+  if (error || meta.error) return <ErrorState error={error || meta.error} />
+  if (loading || meta.loading) return <Loading />
+  const period = meta.data.period
   const q = data.quality
   const yearly = data.yearly.map(row => ({ ...row, period: String(row.year) }))
   return <>
     <SectionHeader eyebrow="Panorama nacional" title="Contrataciones públicas, explicadas con evidencia"
-      description="Una lectura ejecutiva de 198 mil procesos y cinco experimentos de minería de datos. Cada hallazgo puede abrirse para revisar cómo fue calculado."
-      question="¿Qué aprendemos de las contrataciones publicadas entre 2023 y 2025?" />
+      description={`Una lectura ejecutiva de ${integer(data.quality.selected_processes)} procesos y cinco experimentos de minería de datos. Cada hallazgo puede abrirse para revisar cómo fue calculado.`}
+      question={`¿Qué aprendemos de las contrataciones publicadas en ${period}?`} />
     <div className="hero-panel">
       <div><span className="kicker">Cobertura analítica validada</span><h2>{integer(q.selected_processes)} procesos</h2><p>Convocatorias efectivas entre {q.min_date} y {q.max_date}. Los registros históricos fuera del periodo fueron separados.</p></div>
       <div className="hero-seal"><ShieldCheck /><strong>{Object.values(data.validation.checks).filter(Boolean).length}</strong><span>controles superados</span></div>
     </div>
     <div className="stat-grid four">
-      <Stat label="Registros originales" value={integer(q.raw_records)} note="Tres archivos JSONL" />
-      <Stat label="Procesos del periodo" value={integer(q.selected_processes)} note="2023–2025" tone="green" />
+      <Stat label="Registros originales" value={integer(q.raw_records)} note={`${meta.data.source.files} archivos JSONL`} />
+      <Stat label="Procesos del periodo" value={integer(q.selected_processes)} note={period} tone="green" />
       <Stat label="Reglas interpretadas" value={data.selected_rules} note="Soporte y lift validados" tone="orange" />
       <Stat label="Estado del pipeline" value={data.run.status === 'complete' ? 'Completo' : data.run.status} note="Última ejecución" tone="navy" />
     </div>

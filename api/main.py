@@ -32,6 +32,28 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/api/meta")
+def meta():
+    """Datos de contexto que la web no debe tener escritos en el código: años, totales y fuente."""
+    def build():
+        years = sorted(int(y) for y in frame("eda/sql_yearly_totals.csv")["year"])
+        quality = document("metadata/quality_summary.json")
+        sources = document("metadata/source_manifest.json")
+        return {
+            "years": years,
+            "period": f"{years[0]}–{years[-1]}" if years else "",
+            "selected_processes": quality["selected_processes"],
+            "raw_records": quality["raw_records"],
+            "source": {
+                "url": sources[0].get("source_url") if sources else None,
+                "license": sources[0].get("license") if sources else None,
+                "published_at": sources[0].get("published_at") if sources else None,
+                "files": len(sources),
+            },
+        }
+    return safe(build)
+
+
 @app.get("/api/overview")
 def overview():
     def build():
