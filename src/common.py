@@ -50,9 +50,16 @@ def save_csv(name, rows, columns=None):
 
 
 def processes(spark):
+    """Tabla analítica completa de procesos (montos, conversiones, conteos)."""
+    return spark.read.parquet(str(PROCESSED / 'processes'))
+
+
+def features(spark):
+    """Tabla delgada con texto, shingles y atributos categóricos (Partes II, III y V)."""
     return spark.read.parquet(str(PROCESSED / 'process_features'))
 
 
 def sample_processes(spark, n):
+    """Muestra reproducible: los n procesos con menor SHA-256(ocid + semilla)."""
     from pyspark.sql import functions as F
-    return processes(spark).orderBy(F.sha2(F.concat(F.col('ocid'), F.lit(str(SEED))), 256)).limit(n).toPandas()
+    return features(spark).orderBy(F.sha2(F.concat(F.col('ocid'), F.lit(str(SEED))), 256)).limit(n).toPandas()

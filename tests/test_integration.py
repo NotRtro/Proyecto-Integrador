@@ -20,6 +20,12 @@ def test_ocds_to_partitioned_parquet(tmp_path,monkeypatch):
         assert report['selected_processes']==3 and report['duplicate_ocids']==1
         df=spark.read.parquet(str(tmp_path/'processed'/'processes'))
         row=df.filter("ocid = 'a'").first(); assert row.tender_amount_pen==200
+        # process_features es la tabla delgada para similitud y reglas; processes no lleva shingles.
+        features=spark.read.parquet(str(tmp_path/'processed'/'process_features'))
+        assert set(features.columns)==set(build.FEATURE_COLUMNS) and 'shingles' not in df.columns
+        # Con 3 documentos cada término supera df 30 % y se vuelve stopword: el caso real se prueba
+        # en test_domain_stopwords_and_shingles; aquí solo se verifica el tipo de la columna.
+        assert isinstance(features.filter("ocid = 'a'").first().shingles, list)
         assert row.buyer_level=='otro' and report['buyer_levels']['classified_share']==0.0
         usd=df.filter("ocid = 'usd'").first(); assert usd.award_amount_pen==190 and usd.award_converted_count==1
         usd_zero=df.filter("ocid = 'usd-zero'").first(); assert usd_zero.award_amount_pen==38 and usd_zero.award_unconverted_count==0

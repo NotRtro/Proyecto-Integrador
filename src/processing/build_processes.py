@@ -49,7 +49,11 @@ FIELDS = {
 }
 CHILDREN = ['items', 'awards', 'suppliers', 'contracts']
 # Columnas calculadas en Spark después del parseo (no salen de `flatten`).
-DERIVED = {'processes': ['shingles'], 'suppliers': ['supplier_name_original', 'supplier_type']}
+DERIVED = {'suppliers': ['supplier_name_original', 'supplier_type']}
+# Tabla delgada para las Partes II, III y V: lo justo para representar y muestrear procesos.
+# Las tablas completas (montos, conversiones, conteos) quedan en `processes`.
+FEATURE_COLUMNS = ['ocid', 'effective_date', 'year', 'month', 'buyer_id', 'buyer_level', 'department', 'category',
+                   'method', 'amount_band', 'competition', 'tender_amount_pen', 'text', 'normalized_text', 'shingles']
 SUPPLIER_TYPES = ['persona_natural', 'persona_juridica', 'consorcio', 'extranjero', 'otro']
 GRAINS = {'items': ['ocid', 'item_id'], 'awards': ['ocid', 'award_id'],
           'suppliers': ['ocid', 'award_id', 'supplier_id'], 'contracts': ['ocid', 'contract_id']}
@@ -351,17 +355,16 @@ def run(spark=None):
         stopwords = domain_stopwords(selected_rows)
         save_json('metadata/domain_stopwords.json', dict(
             threshold=DOMAIN_STOPWORD_DF, shingle_width=SHINGLE_WIDTH, documents=selected_rows.count(), terms=stopwords))
-    selected = (recompute_award_totals(selected_rows.select(*FIELDS['processes']), tables['awards'])
-                .withColumn('shingles', shingles_column([t['term'] for t in stopwords]))
-                .select(*output_fields('processes'))
-                .cache())
+    selected = recompute_award_totals(selected_rows.select(*FIELDS['processes']), tables['awards']).cache()
+    features = (selected.withColumn('shingles', shingles_column([t['term'] for t in stopwords]))
+                .select(*FEATURE_COLUMNS))
     with timer.step('escritura processes'):
         write_partitioned(selected, 'processes')
     for name, df in tables.items():
         with timer.step(f'escritura {name}'):
             write_partitioned(df, name)
     with timer.step('escritura process_features'):
-        write_partitioned(selected, 'process_features')
+        write_partitioned(features, 'process_features')
     with timer.step('reporte de calidad'):
         # Releer lo escrito evita recalcular conversiones y joins en el reporte de calidad.
         # El esquema es explícito porque una tabla vacía no deja archivos de los que inferirlo.
@@ -372,7 +375,8 @@ def run(spark=None):
         quality['suppliers'] = supplier_report(written['suppliers'])
         save_csv('metadata/buyer_levels.csv', entities)
     save_json('metadata/quality_summary.json', quality)
-    save_json('metadata/analytical_schema.json', {k: schema(k).jsonValue() for k in FIELDS})
+    save_json('metadata/analytical_schema.json',
+              {**{k: schema(k).jsonValue() for k in FIELDS}, 'process_features': features.schema.jsonValue()})
     save_json('metadata/processing_timings.json', timer.steps)
     for df in (unique, selected_rows, selected):
         df.unpersist()
