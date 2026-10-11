@@ -35,7 +35,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--from-stage',
-        choices=['validation', 'processing', 'part1', 'part2', 'part3', 'part4', 'part5', 'export'],
+        choices=['validation', 'processing', 'part1', 'part2', 'part3', 'part4', 'part5', 'signals', 'export'],
         default='validation',
     )
     parser.add_argument(
@@ -56,7 +56,7 @@ def main():
     stages = (
         [('validation', 'src.ingestion.validate_files'), ('processing', 'src.processing.build_processes')]
         + [(f'part{i}', f'src.part{i}.run') for i in range(1, 6)]
-        + [('export', 'src.export.web_artifacts')]
+        + [('signals', 'src.signals.run'), ('export', 'src.export.web_artifacts')]
     )
     try:
         revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], stderr=subprocess.DEVNULL, text=True).strip()

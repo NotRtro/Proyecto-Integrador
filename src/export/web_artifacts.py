@@ -54,6 +54,10 @@ REQUIRED = [
     'association/rules.csv',
     'association/selected_rules.json',
     'association/single_bidder_rules.csv',
+    'integrity/summary.csv',
+    'integrity/by_dimension.csv',
+    'integrity/cooccurrence.csv',
+    'integrity/buyers.csv',
 ]
 
 
@@ -97,6 +101,8 @@ def analytic_checks():
     bloom = read('streaming/bloom_grid.csv')
     bench = read('association/algorithm_benchmark.csv')
     rules = read('association/rules.csv')
+    signals = read('integrity/summary.csv')
+    processes = read('metadata/quality_summary.json')['selected_processes']
     return {
         'hhi_in_range': all(0 <= r['hhi'] <= 10000 for r in read('eda/concentration_metrics.json'))
         and between(read('eda/buyer_supplier_hhi.csv').hhi, 0, 10000),
@@ -125,6 +131,8 @@ def analytic_checks():
         'rules_metrics_in_range': between(rules.support)
         and between(rules.confidence)
         and bool((rules.lift >= 0).all()),
+        'signals_cover_every_process': bool((signals[signals.year == 'Todos'].processes == processes).all()),
+        'signal_rates_in_range': between(signals.rate.dropna()) and bool((signals.flagged <= signals.evaluable).all()),
     }
 
 
