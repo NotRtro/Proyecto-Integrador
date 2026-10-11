@@ -105,7 +105,7 @@ cd frontend && VITE_STATIC=1 VITE_BASE=/Proyecto-Integrador/ npm run build
 | `src/part5/` | **Spark** + local | FP-Growth (MLlib) sobre todas las canastas y sobre los segmentos UNSPSC que se compran juntos; Apriori propio sobre una muestra como referencia |
 | `scripts/build_notebook.py` | local | Genera `notebooks/sustento.ipynb`: un gráfico y una comprobación automática por afirmación |
 | `src/signals/` | **Spark** | Cuatro señales de riesgo por proceso (un solo participante, contratación directa, proveedor dominante, compra repetida), su tasa por dimensión y su coincidencia |
-| `src/export/web_artifacts.py` | local | 21 controles de consistencia antes de servir la web |
+| `src/export/web_artifacts.py` | local | 22 controles de consistencia antes de servir la web |
 | `api/` | FastAPI | Filtra artefactos precalculados; no recalcula métricas oficiales |
 | `frontend/` | React | Reporte por pregunta; controles que recalculan en vivo las curvas teóricas |
 
@@ -127,9 +127,9 @@ Cada módulo explica en su docstring el motor que usa y el motivo, sus entradas 
 
 - `artifacts/metadata/`: manifiestos de fuente y de corrida (con el commit del código), calidad, esquema, stopwords y tiempos de procesamiento.
 - `artifacts/{eda,similarity,ann,streaming,association,integrity}/`: resultados de cada parte.
-- `artifacts/metadata/artifact_validation.json`: 21 controles, entre ellos conservación de montos, garantías de Bloom, CMS y DGIM, FPR de Bloom igual al teórico con la misma ocupación, equivalencia Apriori = FP-Growth y MinHash que se acerca a la teoría.
+- `artifacts/metadata/artifact_validation.json`: 22 controles, entre ellos conservación de montos, garantías de Bloom, CMS y DGIM, FPR de Bloom igual al teórico con la misma ocupación, equivalencia Apriori = FP-Growth y MinHash que se acerca a la teoría.
 - `notebooks/sustento.ipynb`: el sustento de cada parte con gráficos y comprobaciones automáticas (✔/✘) contra la teoría o la versión exacta; se regenera con `make notebook`.
-- `tests/`: 68 tests de pytest (algoritmos e integración con Spark). `frontend/src/__tests__`: render de todas las páginas con datos reales y completitud del contenido escrito.
+- `tests/`: 69 tests de pytest (algoritmos e integración con Spark). `frontend/src/__tests__`: render de todas las páginas con datos reales y completitud del contenido escrito.
 
 ## Interpretaciones y casos
 

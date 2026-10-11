@@ -427,9 +427,39 @@ check('Parte V', 'Todo conjunto de compra conjunta frecuente tiene al menos el m
       bool((co['count'] >= cs['min_count']).all()))
 """)
 
+# ---------------------------------------------------------------- Competencia ajustada
+md("""
+## 9. Q2 · ¿La modalidad explica el postor único entre compras parecidas?
+
+**Qué se afirma.** La contratación directa mantiene una tasa mucho mayor de un solo participante cuando se compara con
+las modalidades competitivas dentro de la misma categoría, departamento, año y banda de monto. La rejilla LSH, además,
+se repite con otras muestras por bloques para ver cuánto depende de las entidades elegidas: depende bastante, y la
+muestra principal resulta ser el mejor caso.
+""")
+code("""
+adj = csv('eda/single_bidder_adjusted.csv'); per = doc('eda/single_bidder_persistence.json')
+mod = adj[(adj.level == 'modalidad') & (adj.informed >= 1000)].set_index('name')
+ax = (mod[['raw_rate', 'adjusted_rate']] * 100).rename(columns={'raw_rate': 'Observada', 'adjusted_rate': 'Ajustada'}).plot.barh(color=[NAVY, ORANGE])
+ax.invert_yaxis(); ax.set_xlabel('% con un solo participante'); ax.set_title('Tasa por modalidad: observada y a igual mezcla de estratos'); plt.show()
+bm = csv('eda/bidders_by_modality.csv').set_index('modality')
+check('Q2', 'La tasa observada por modalidad coincide con la de la tabla de postores',
+      bool(np.allclose(mod.raw_rate, bm.single_share.reindex(mod.index), atol=1e-9)))
+check('Q2', 'Contratación directa supera a las competitivas en todos los estratos comparables',
+      per['strata_where_direct_is_higher'] == per['comparable_strata'] > 0,
+      f"{per['strata_where_direct_is_higher']} de {per['comparable_strata']} estratos")
+
+stab = csv('similarity/lsh_stability.csv'); best = csv('similarity/lsh_parameter_grid.csv').sort_values(['f1', 'recall']).iloc[-1]
+row = stab[stab.config == best.config].iloc[0]
+display(stab.sort_values('f1_mean', ascending=False).head(8).round(3))
+print(f'{best.config}: F1 de {row.f1_min:.2f} a {row.f1_max:.2f} (media {row.f1_mean:.2f}) y recall de '
+      f'{row.recall_min:.0%} a {row.recall_max:.0%} en {int(row.samples)} muestras. La muestra principal es el mejor caso.')
+check('Parte II', 'Cada configuración de la rejilla se evaluó en todas las muestras por bloques',
+      bool((stab.samples == stab.samples.max()).all()) and stab.samples.max() >= 5)
+""")
+
 # ---------------------------------------------------------------- Señales
 md("""
-## 9. Q4 · Señales de riesgo por proceso
+## 10. Q4 · Señales de riesgo por proceso
 
 **Qué se afirma.** Cuatro señales marcan procesos para revisar: un solo participante reportado en modalidades
 competitivas, contratación directa, proveedor dominante y compra repetida detectada por LSH. Son poco frecuentes y
@@ -488,7 +518,7 @@ else:
 
 # ---------------------------------------------------------------- Resumen
 md("""
-## 10. Resumen de comprobaciones
+## 11. Resumen de comprobaciones
 """)
 code("""
 summary = pd.DataFrame(CHECKS)
