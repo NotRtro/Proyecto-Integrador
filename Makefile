@@ -1,4 +1,4 @@
-.PHONY: all build up download run rapido test down dev-sample dev static
+.PHONY: all build up download run rapido test down dev-sample dev static notebook
 all: build up download run
 build:
 	CODE_VERSION=$$(git rev-parse --short HEAD) docker compose build
@@ -29,3 +29,6 @@ dev:
 # Web estática para publicar (GitHub Pages): exporta las respuestas de la API a frontend/public/data.
 static:
 	docker compose run --rm --no-deps -v "$(CURDIR)/frontend/public:/out" api python -m api.export_static /out/data
+# Cuaderno de sustento: genera notebooks/sustento.ipynb y lo ejecuta sobre los artefactos (gráficos + comprobaciones).
+notebook:
+	docker compose run --rm --no-deps -v "$(CURDIR):/workspace" pipeline sh -c "pip install -q -r requirements-notebook.txt && python scripts/build_notebook.py && jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeout=600 notebooks/sustento.ipynb"

@@ -12,3 +12,7 @@ ignore = ["E731"]
 
 [lint.isort]
 known-first-party = ["src", "api"]
+
+[lint.per-file-ignores]
+# El código de las celdas del cuaderno va dentro de cadenas: se mide con el ancho del cuaderno, no del módulo.
+"scripts/build_notebook.py" = ["E501"]
