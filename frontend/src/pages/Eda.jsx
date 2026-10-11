@@ -96,6 +96,23 @@ export default function Eda() {
       </div>
     </FindingModule>
 
+    {t.item_segments?.length > 0 && <FindingModule id="eda-items" part="Parte I · frecuencia de ítems" question="¿Qué bienes y servicios se piden con más frecuencia y cuáles concentran el dinero?"
+      pipeline={[['items (Parquet)', 'Spark', 'código CUBSO de cada ítem'], ['Segmento UNSPSC = 2 primeros dígitos', 'Spark'], ['groupBy segmento y código', 'Spark', 'ítems, procesos, monto']]}>
+      <div className="stat-grid four">
+        <Stat label="Ítems" value={integer(t.item_summary.items)} note={`en ${integer(t.item_summary.processes_with_items)} procesos`} />
+        <Stat label="Códigos distintos" value={integer(t.item_summary.distinct_codes)} note={`${integer(t.item_summary.distinct_commodities)} productos UNSPSC`} tone="green" />
+        <Stat label="Segmento más pedido" value={t.item_segments[0].segment_name} note={`${percent(t.item_segments[0].share_items)} de los ítems`} tone="orange" />
+        <Stat label="Ítems por proceso" value={(t.item_summary.items / t.item_summary.processes_with_items).toFixed(2)} note="casi siempre uno" tone="navy" />
+      </div>
+      <div className="two-col">
+        <Card title="Segmentos con más ítems" subtitle="Número de ítems pedidos 2023–2025"><ExecutiveBar data={t.item_segments.slice(0, 15)} category="segment_name" value="items" formatter={integer} height={400} /></Card>
+        <Card title="Segmentos con más monto" subtitle="Monto de los ítems en soles"><ExecutiveBar data={[...t.item_segments].sort((a, b) => b.amount_pen - a.amount_pen).slice(0, 15)} category="segment_name" value="amount_pen" color="#de7c45" formatter={money} height={400} /></Card>
+      </div>
+      <Card title="Los códigos más pedidos" subtitle="Código CUBSO con su descripción más frecuente">
+        <DataTable rows={t.item_codes.map(r => ({ código: r.classification, descripción: r.description, segmento: r.segment_name, ítems: r.items, procesos: r.processes, monto: money(r.amount_pen) }))} limit={20} />
+      </Card>
+    </FindingModule>}
+
     <FindingModule id="eda-montos" part="Parte I · montos" question="¿Cómo se distribuyen los montos convocados?"
       pipeline={[['tender_amount_pen', 'Spark'], ['log10 y percentile_approx', 'Spark', 'histograma y percentiles por año y categoría']]}>
       <Card title="Histograma del monto convocado (escala logarítmica)" subtitle={`Procesos por intervalo de monto · ${filters.year === 'Todos' ? meta.data.period : filters.year}`}><Histogram rows={t.histogram} year={filters.year} /></Card>

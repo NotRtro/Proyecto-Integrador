@@ -3,6 +3,7 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 import { api, decimal, integer, percent } from '../api'
 import { Card, DataTable, ErrorState, ExecutiveBar, Filters, FindingModule, Loading, SectionHeader, Select, Stat } from '../components'
 import { useAsync, useMeta } from '../hooks'
+import Participation from './Participation'
 
 const DIMENSIONS = { modality: 'Modalidad', category: 'Categoría', department: 'Departamento', amount_band: 'Banda de monto', buyer_level: 'Nivel de gobierno' }
 
@@ -56,6 +57,8 @@ export default function Competition() {
         <DataTable rows={d.bidders.map(r => ({ modalidad: r.modality, procesos: r.processes, mediana: r.median, p90: r.p90, máximo: r.max, 'un participante': percent(r.single_share), '10 o más': percent(r.ten_or_more_share) }))} limit={12} />
       </Card>}
     </FindingModule>
+
+    <Participation d={d} />
 
     <FindingModule id="q2-reglas" part="Parte V · reglas dirigidas" question="¿Qué combinaciones de características elevan la probabilidad de tener un solo postor?"
       pipeline={[['Canastas por proceso', 'Spark', 'categoría, modalidad, departamento, monto, postores, nivel'], ['Sin modalidades no competitivas', 'Spark', 'más de 50 % de postor único: directa, internacional, convenios…'], ['FP-Growth (soporte 0,2 %)', 'Spark'], ['Reglas A → POSTORES=uno', 'local', 'lift frente a la tasa base']]}>

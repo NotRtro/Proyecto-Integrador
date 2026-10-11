@@ -4,6 +4,7 @@ import { api, decimal, integer, ms, percent } from '../api'
 import { Card, DataTable, ErrorState, Filters, FindingModule, Loading, SectionHeader, Select, Stat } from '../components'
 import { useAsync } from '../hooks'
 import reviewed from '../content/similarity_cases.json'
+import LshGroups from './LshGroups'
 
 const KINDS = ['misma entidad, <= 30 días', 'misma entidad, > 30 días', 'entidades distintas']
 
@@ -106,6 +107,8 @@ export default function Similarity() {
         </details>)}</div> : <p className="empty">Sin casos interpretados.</p>}
       </Card>
     </FindingModule>
+
+    <LshGroups s={s} />
 
     <FindingModule id="q3-vecinos" part="Parte III · búsqueda de vecinos" question="Dado un proceso, ¿cuáles son los más parecidos, y cuánto se pierde al buscarlos de forma aproximada?"
       pipeline={[['Texto normalizado', 'Spark'], ['TF-IDF (1–2 gramas) + SVD 256', 'local', 'scikit-learn'], ['Índice HNSW o IVF', 'local', 'faiss'], ['Top-10 por coseno', 'local', 'frente a fuerza bruta']]}>

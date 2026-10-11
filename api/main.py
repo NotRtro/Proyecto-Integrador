@@ -210,6 +210,10 @@ def eda_technical():
             "percentiles": optional_records("eda/amount_percentiles.csv"),
             "outliers": records(frame("eda/amount_outlier_summary.csv")),
             "timings": optional_document("eda/part1_timings.json", []),
+            "item_segments": optional_records("eda/item_segments.csv"),
+            "item_codes": optional_records("eda/item_codes.csv"),
+            "item_segments_by_year": optional_records("eda/item_segments_by_year.csv"),
+            "item_summary": optional_document("eda/item_summary.json", {}),
         }
     )
 
@@ -265,6 +269,9 @@ def competition(dimension: str = "modality", year: str = "Todos"):
             "dgim": records(dgim[dgim.signal == "postor_unico"]),
             "dgim_series": records(series[series.signal == "postor_unico"]),
             "bidders": optional_records("eda/bidders_by_modality.csv"),
+            "participation": optional_records("eda/participation_rankings.csv"),
+            "participation_bins": optional_records("eda/participation_bins.csv"),
+            "participation_summary": optional_document("eda/participation_summary.json", {}),
         }
 
     return safe(build)
@@ -286,6 +293,8 @@ def similarity():
             "repeated_summary": optional_records("similarity/repeated_summary.csv"),
             "repeated_top_buyers": optional_records("similarity/repeated_top_buyers.csv"),
             "case_candidates": optional_document("similarity/case_candidates.json", {}),
+            "groups": optional_records("similarity/lsh_groups.csv"),
+            "groups_summary": optional_document("similarity/lsh_groups_summary.json", {}),
             "methodology": document("similarity/methodology.json"),
         }
 
@@ -359,6 +368,8 @@ def streaming():
             "memory": records(frame("streaming/memory_comparison.csv")),
             "repeat_winners": optional_records("streaming/repeat_winners.csv"),
             "live": optional_document("streaming/live_params.json", {}),
+            "replay": optional_records("streaming/replay_batches.csv"),
+            "replay_summary": optional_document("streaming/replay_summary.json", {}),
             "methodology": document("streaming/methodology.json"),
         }
     )
@@ -379,6 +390,15 @@ def association(year: str = "Todos", kind: str | None = None):
             "single_bidder_rules": optional_records("association/single_bidder_rules.csv"),
             "missing": optional_records("association/missing_report.csv"),
             "benchmark": records(frame("association/algorithm_benchmark.csv")),
+            "itemsets": records(
+                frame("association/frequent_itemsets_fpgrowth.csv")
+                .query("min_support == 0.02")
+                .sort_values("support", ascending=False)
+                .head(60)
+            ),
+            "copurchase_itemsets": optional_records("association/copurchase_itemsets.csv"),
+            "copurchase_rules": optional_records("association/copurchase_rules.csv"),
+            "copurchase_summary": optional_document("association/copurchase_summary.json", {}),
         }
 
     return safe(build)

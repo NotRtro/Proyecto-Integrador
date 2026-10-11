@@ -3,6 +3,7 @@ import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContai
 import { api, bytes, decimal, integer, percent } from '../../api'
 import { Card, DataTable, ErrorState, Filters, FindingModule, Loading, Range, Select, Stat } from '../../components'
 import { useAsync } from '../../hooks'
+import StreamReplay from './StreamReplay'
 
 const bloomFpr = (m, k, n) => (1 - Math.exp(-k * n / m)) ** k
 
@@ -117,5 +118,5 @@ export default function StreamLab() {
   const result = useAsync(() => api('/api/streaming'), [])
   if (result.error) return <ErrorState error={result.error} />
   if (result.loading) return <Loading />
-  return <><BloomLab d={result.data} /><CmsLab d={result.data} /><DgimLab d={result.data} /></>
+  return <><StreamReplay d={result.data} /><BloomLab d={result.data} /><CmsLab d={result.data} /><DgimLab d={result.data} /></>
 }

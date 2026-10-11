@@ -3,6 +3,7 @@ import { api, decimal, integer, percent } from '../../api'
 import { Card, DataTable, ErrorState, ExecutiveBar, Filters, FindingModule, Loading, Range, Select, Stat } from '../../components'
 import { useAsync, useMeta } from '../../hooks'
 import interpretations from '../../content/rules.json'
+import Itemsets from './Itemsets'
 
 const KINDS = ['informativa', 'normativa', 'datos faltantes']
 
@@ -22,7 +23,7 @@ export default function RulesLab() {
   const d = result.data
   const kinds = KINDS.map(k => ({ tipo: k, reglas: d.rules.filter(r => r.kind === k).length }))
   const sample = d.benchmark.filter(r => r.scope === 'same_sample')
-  return <FindingModule id="lab-reglas" part="Parte V · Apriori y FP-Growth" question="¿Qué características de los procesos aparecen juntas más de lo esperable?"
+  return <><FindingModule id="lab-reglas" part="Parte V · Apriori y FP-Growth" question="¿Qué características de los procesos aparecen juntas más de lo esperable?"
     pipeline={[['Canasta por proceso', 'Spark', 'CAT, MODALIDAD, DEP, MONTO, POSTORES, NIVEL'], ['Apriori propio (muestra)', 'local', 'referencia'], ['FP-Growth (todas las canastas)', 'Spark', 'MLlib'], ['Reglas por año y tipo', 'local']]}>
     <div className="lab">
       <Filters>
@@ -60,4 +61,6 @@ export default function RulesLab() {
       </Card>
     </div>
   </FindingModule>
+  <Itemsets d={d} />
+  </>
 }

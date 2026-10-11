@@ -45,3 +45,6 @@ main { margin-left:254px; padding: 0 46px 80px; max-width: 1660px; }
 .range-steps{display:flex;gap:6px;flex-wrap:wrap}.range-steps button{border:1px solid #cbd7d4;background:#fff;border-radius:8px;padding:6px 10px;font-size:12px}.range-steps button.active{background:var(--teal);color:#fff;border-color:var(--teal)}.hint{font-size:12px;color:var(--muted);line-height:1.45;margin:0}
 .concept{display:grid;grid-template-columns:1fr 1fr;gap:20px}.concept svg{width:100%;height:auto;background:#fff;border:1px solid var(--line);border-radius:12px}.concept p{font-size:14px;line-height:1.6;color:#41545c}
 @media (max-width: 1100px){.concept{grid-template-columns:1fr}}
+
+.play { align-self: end; border: 0; border-radius: 10px; padding: 10px 16px; background: #167c80; color: #fff; font-weight: 600; cursor: pointer; }
+.play:hover { background: #10656a; }
