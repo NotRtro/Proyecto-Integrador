@@ -4,10 +4,10 @@ x-pipeline: &pipeline
     dockerfile: Dockerfile.pipeline
   image: oece-pipeline:local
   volumes:
-    # Escritura permitida: download.py guarda aquí los .jsonl.gz y su manifiesto.
-    - ./data/raw:/data/raw
-    - ./data/processed:/data/processed
-    - ./artifacts:/artifacts
+    # DATA_DIR contiene raw/ y processed/; download.py escribe en raw/.
+    # Modo muestra: DATA_DIR=./data/dev ARTIFACTS_DIR=./data/dev/artifacts (ver make dev).
+    - ${DATA_DIR:-./data}:/data
+    - ${ARTIFACTS_DIR:-./artifacts}:/artifacts
   environment: &environment
     RAW_PATH: /data/raw
     PROCESSED_PATH: /data/processed
@@ -68,7 +68,7 @@ services:
       context: .
       dockerfile: Dockerfile.api
     ports: ["127.0.0.1:8000:8000"]
-    volumes: ["./artifacts:/artifacts:ro"]
+    volumes: ["${ARTIFACTS_DIR:-./artifacts}:/artifacts:ro"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 10s

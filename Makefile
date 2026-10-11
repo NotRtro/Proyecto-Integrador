@@ -1,4 +1,4 @@
-.PHONY: all build up download run test down
+.PHONY: all build up download run test down dev-sample dev
 all: build up download run
 build:
 	docker compose build
@@ -15,3 +15,11 @@ test:
 	docker compose run --rm --no-deps -v "$(CURDIR)/scripts:/checks:ro" api python /checks/test_frontend.py
 down:
 	docker compose down
+# Modo muestra: ~3 % de las líneas para probar el pipeline en minutos (cifras no válidas para el informe).
+dev-sample:
+	docker compose run --rm --no-deps pipeline python scripts/make_dev_sample.py
+dev: export DATA_DIR = ./data/dev
+dev: export ARTIFACTS_DIR = ./data/dev/artifacts
+dev:
+	docker compose up -d --wait spark-master spark-worker-1 spark-worker-2 api web
+	docker compose run --rm pipeline python -m src.run_all

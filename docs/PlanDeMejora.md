@@ -57,7 +57,7 @@ Fase 0 Cimientos ─► Fase 1 Capa de datos ─► Fases 2–6 Partes I–V ─
 | Paso | IDs | Qué se hace | Criterio de aceptación |
 |---|---|---|---|
 | [x] 0.1 | C-03 | `download.py` descarga de verdad los `.jsonl.gz` 2023–2025 del registro OCDS (publicación 135), con reintentos, reanudación y SHA-256. Los datos van a `data/raw/` y `docker-compose.yml` monta `./data/raw` en lugar de la raíz del repo. | `python -m src.ingestion.download` deja los 3 archivos y `validate_files` pasa |
-| [ ] 0.2 | — | `scripts/make_dev_sample.py` toma N líneas por año y las deja en `data/raw_dev/`. La variable `RAW_PATH` permite elegir completo o muestra. | `run_all` termina sobre la muestra en menos de 10 min |
+| [x] 0.2 | — | `scripts/make_dev_sample.py` toma N líneas por año y las deja en `data/raw_dev/`. La variable `RAW_PATH` permite elegir completo o muestra. | `run_all` termina sobre la muestra en menos de 10 min |
 | [ ] 0.3 | B-01, B-02, B-03, VI-07 | Corregir la carga infinita en Ann y Similarity cuando la API falla. Quitar "198 mil" y los años escritos en el código: un endpoint `/api/meta` entrega años y totales. | Con la API caída, la página muestra el error. No quedan cifras ni años fijos en `frontend/src` |
 | [ ] 0.4 | B-04, V-05 | `test_api.py` valida invariantes (rangos, no vacío, `found >= 8` o estado `insufficient_evidence`) en lugar de cantidades exactas. | `make test` pasa con artefactos de la muestra |
 | [ ] 0.5 | — | Corrida base completa con el código actual, guardando una copia de `artifacts/` como referencia para comparar después. | `run_manifest.status == complete` |
@@ -66,7 +66,7 @@ Fase 0 Cimientos ─► Fase 1 Capa de datos ─► Fases 2–6 Partes I–V ─
 
 | Paso | IDs | Qué se hace | Criterio de aceptación |
 |---|---|---|---|
-| [ ] 1.1 | C-08, C-02 | Refactorizar `build_processes.py`: las tasas de cambio se pasan como parámetros (sin atributos de función) y el `run()` se divide en funciones con nombre. | Test de integración pasa; mismos conteos que la corrida base |
+| [ ] 1.1 | C-08, C-02 | Refactorizar `build_processes.py`: las tasas de cambio se pasan como parámetros (sin atributos de función) y el `run()` se divide en funciones con nombre. **Rendimiento:** con la muestra de 8 mil registros, `processing` tardó 246 s de 498 s. Revisar los `.gz` no divisibles (una partición por archivo), los `count()` repetidos y el reparseo. | Test de integración pasa; mismos conteos que la corrida base; `processing` más rápido |
 | [ ] 1.2 | V-04, G-03 | Nueva columna `buyer_level` (nacional / regional / local / empresa pública / otro) derivada del nombre de la entidad con reglas documentadas. | Más del 95 % clasificado; el porcentaje queda en `quality_summary.json` |
 | [ ] 1.3 | I-08, G-03 | Normalizar proveedores: nombre canónico por `supplier_id` (el más reciente), bandera `is_consortium` y conteo de variantes de nombre. | `quality_summary` reporta cuántos IDs tenían varios nombres |
 | [ ] 1.4 | II-06 | Stopwords de dominio: Spark calcula la frecuencia documental y agrega los términos con df > 30 %. Se guardan en `metadata/domain_stopwords.json` y los shingles se generan después. Se conservan los tokens numéricos de un carácter (evita el caso "-1" / "-2"). | Lista publicada; test de normalización actualizado |

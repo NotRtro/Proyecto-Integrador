@@ -13,5 +13,6 @@ COPY requirements-pipeline.txt .
 RUN pip install --no-cache-dir -r requirements-pipeline.txt
 COPY src src
 COPY tests tests
+COPY scripts scripts
 COPY pytest.ini .
 CMD ["python", "-m", "src.run_all"]

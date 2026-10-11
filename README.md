@@ -23,6 +23,26 @@ Abrir **http://localhost:8501**. La documentación interactiva de la API está e
 
 `data/raw/`, `data/processed/` y `artifacts/` son directorios persistentes del anfitrión; `docker compose down` no los elimina. La descarga es reanudable y no se repite si el archivo local coincide en tamaño y fecha de publicación (`--force` la fuerza). `data/raw/download_manifest.json` registra URL, fecha `Last-Modified`, tamaño y SHA-256 de cada archivo: el portal se actualiza mensualmente, así que ese manifiesto identifica la versión exacta de los datos usada. Se admiten `.jsonl` y `.jsonl.gz`, pero no el mismo año en ambos formatos.
 
+## Modo muestra (desarrollo)
+
+Para probar cambios sin esperar la corrida completa, se usa una muestra reproducible del 3 % de las líneas (unos 8 mil registros). Sus cifras **no** son válidas para el informe.
+
+```bash
+make dev-sample   # crea data/dev/raw a partir de data/raw
+make dev          # corre todo el pipeline con DATA_DIR=./data/dev y ARTIFACTS_DIR=./data/dev/artifacts
+```
+
+Sin `make` (por ejemplo en Windows con Git Bash):
+
+```bash
+docker compose run --rm --no-deps pipeline python scripts/make_dev_sample.py
+export DATA_DIR=./data/dev ARTIFACTS_DIR=./data/dev/artifacts
+docker compose up -d --wait spark-master spark-worker-1 spark-worker-2 api web
+docker compose run --rm pipeline python -m src.run_all
+```
+
+La API y la web leen `ARTIFACTS_DIR`, así que con esas variables muestran los resultados de la muestra. Para volver a los datos completos, abrir otra terminal o ejecutar `unset DATA_DIR ARTIFACTS_DIR` y repetir `docker compose up -d`.
+
 ## Comandos
 
 ```bash
