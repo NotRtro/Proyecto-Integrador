@@ -38,7 +38,7 @@ Después, abrir **http://localhost:8501** (web), **http://localhost:8000/docs** 
 
 ### Perfiles, mediciones y cachés
 
-Lo que responde Q1, Q2 y Q3 usa siempre **todos** los datos; los perfiles solo cambian la evaluación de ANN y si se repiten las mediciones de una vez. Las decisiones y su evidencia están en [docs/DecisionesTecnicas.md](docs/DecisionesTecnicas.md).
+Lo que responde Q1, Q2 y Q3 usa siempre **todos** los datos; los perfiles solo cambian la evaluación de ANN y si se repiten las mediciones de una vez. Las decisiones y su evidencia (qué se pierde al muestrear con cada diseño de muestra y cuánto cuesta no hacerlo) están en la web, en *Datos y KDD → Decisiones de volumen*, y en `artifacts/metadata/data_decisions.json`.
 
 | Modo | Comando | Tiempo medido |
 |---|---|---|
@@ -98,7 +98,7 @@ cd frontend && VITE_STATIC=1 VITE_BASE=/Proyecto-Integrador/ npm run build
 | `src/part3/` | local | TF-IDF, SVD y los índices faiss viven en la memoria de una máquina; las consultas tardan microsegundos |
 | `src/part4/` | Spark + local | Spark ordena el flujo; las estructuras procesan un evento a la vez, como en tiempo real |
 | `src/part5/` | **Spark** + local | FP-Growth (MLlib) sobre todas las canastas; Apriori propio sobre una muestra como referencia |
-| `src/export/web_artifacts.py` | local | 18 controles de consistencia antes de servir la web |
+| `src/export/web_artifacts.py` | local | 19 controles de consistencia antes de servir la web |
 | `api/` | FastAPI | Filtra artefactos precalculados; no recalcula métricas oficiales |
 | `frontend/` | React | Reporte por pregunta; controles que recalculan en vivo las curvas teóricas |
 
@@ -120,15 +120,15 @@ Cada módulo explica en su docstring el motor que usa y el motivo, sus entradas 
 
 - `artifacts/metadata/`: manifiestos de fuente y de corrida (con el commit del código), calidad, esquema, stopwords y tiempos de procesamiento.
 - `artifacts/{eda,similarity,ann,streaming,association}/`: resultados de cada parte.
-- `artifacts/metadata/artifact_validation.json`: 18 controles, entre ellos conservación de montos, garantías de Bloom, CMS y DGIM, equivalencia Apriori = FP-Growth y MinHash que se acerca a la teoría.
-- `tests/`: 57 tests de pytest (algoritmos e integración con Spark). `frontend/src/__tests__`: render de todas las páginas con datos reales.
+- `artifacts/metadata/artifact_validation.json`: 19 controles, entre ellos conservación de montos, garantías de Bloom, CMS y DGIM, FPR de Bloom igual al teórico con la misma ocupación, equivalencia Apriori = FP-Growth y MinHash que se acerca a la teoría.
+- `tests/`: 62 tests de pytest (algoritmos e integración con Spark). `frontend/src/__tests__`: render de todas las páginas con datos reales y completitud del contenido escrito.
 
-## Lo que escribe el equipo
+## Interpretaciones y casos
 
-La web muestra un aviso "Pendiente de redacción" hasta que se completen:
+El texto de análisis de la web vive en `frontend/src/content` y se versiona con el código:
 
-- `frontend/src/content/hallazgos/*.md`: la interpretación de cada uno de los 29 hallazgos, con contexto peruano. Cada archivo trae preguntas guía.
-- `frontend/src/content/rules.json`: la interpretación de las reglas seleccionadas (clave `rule_id`).
-- `frontend/src/content/similarity_cases.json`: los casos de similitud validados en SEACE, a partir de `artifacts/similarity/case_candidates.json`.
+- `hallazgos/*.md`: la interpretación de cada uno de los 30 hallazgos (pregunta, cifras, contexto peruano y límites).
+- `rules.json`: la interpretación de cada regla seleccionada (clave `rule_id`).
+- `similarity_cases.json`: casos de similitud revisados en el registro OCDS completo de ambos procesos, con su nomenclatura para ubicarlos en el SEACE.
 
-La evaluación del proyecto, el plan de mejora y las decisiones técnicas de volumen están en `docs/`. El plan de ejecución original quedó en `docs/historico/`.
+`frontend/src/__tests__/content.test.js` falla si un hallazgo queda sin interpretación o si el pipeline selecciona una regla que no tiene la suya. Si se vuelve a correr el pipeline con datos nuevos, hay que revisar las cifras citadas en estos textos.
