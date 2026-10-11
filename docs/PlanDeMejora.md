@@ -158,7 +158,7 @@ Fase 0 Cimientos ─► Fase 1 Capa de datos ─► Fases 2–6 Partes I–V ─
 | Paso | IDs | Qué se hace | Criterio de aceptación |
 |---|---|---|---|
 | [x] 9.1 | C-02 | Pasada final de `ruff format` y `ruff check` sobre `src/`, `api/` y `tests/`. | Sin errores **Resultado:** `ruff.toml` (120 columnas, comillas preservadas, reglas E/F/W/I): `ruff format` reformateó 52 archivos y `ruff check` pasa sin errores en `src/`, `api/`, `tests/` y `scripts/`. 57 tests en verde. |
-| [ ] 9.2 | C-04 | Archivar `PLAN_EJECUCION_OECE_JSON_DOCKER.md` en `docs/historico/`. README actualizado (descarga, modo muestra, modo estático, publicación). | — |
+| [x] 9.2 | C-04 | Archivar `PLAN_EJECUCION_OECE_JSON_DOCKER.md` en `docs/historico/`. README actualizado (descarga, modo muestra, modo estático, publicación). | — **Resultado:** plan original en `docs/historico/`; README reescrito (preguntas, ejecución, modo muestra, publicación estática, motor de cada módulo, criterios de datos, verificación y lo que redacta el equipo); `PRESENTACION.md` actualizado a Q1–Q3; target `make static`. |
 | [x] 9.3 | C-07 | `CODE_VERSION` como build-arg para el manifiesto. | El manifiesto muestra el commit real **Resultado:** `ARG CODE_VERSION` en `Dockerfile.pipeline`, argumento de build en Compose y `make build` pasa `git rev-parse --short HEAD`; verificado dentro del contenedor. |
 | [ ] 9.4 | — | Corrida completa final: `make test` y `artifact_validation` en verde. | `status == complete` |
 | [ ] 9.5 | VI-01 | Publicar la web estática y dejar el enlace en el README. | URL accesible |

@@ -1,4 +1,4 @@
-.PHONY: all build up download run test down dev-sample dev
+.PHONY: all build up download run test down dev-sample dev static
 all: build up download run
 build:
 	CODE_VERSION=$$(git rev-parse --short HEAD) docker compose build
@@ -23,3 +23,6 @@ dev: export ARTIFACTS_DIR = ./data/dev/artifacts
 dev:
 	docker compose up -d --wait spark-master spark-worker-1 spark-worker-2 api web
 	docker compose run --rm pipeline python -m src.run_all
+# Web estática para publicar (GitHub Pages): exporta las respuestas de la API a frontend/public/data.
+static:
+	docker compose run --rm --no-deps -v "$(CURDIR)/frontend/public:/out" api python -m api.export_static /out/data
