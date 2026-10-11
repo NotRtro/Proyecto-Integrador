@@ -37,45 +37,59 @@ def stage_seconds(manifest, name):
     return round(next((s['seconds'] for s in manifest.get('stages', []) if s['name'] == name), 0.0), 1)
 
 
-def kept(ocid, fraction):
-    """Misma regla para todos los pares: un proceso entra a la muestra según el hash de su ocid."""
-    value = int.from_bytes(hashlib.sha256(f'{ocid}:{SEED}'.encode()).digest()[:4], 'little') % 1000
+def kept(key, fraction):
+    """Misma regla para todos: un proceso (o una entidad) entra a la muestra según el hash de su clave."""
+    value = int.from_bytes(hashlib.sha256(f'{key}:{SEED}'.encode()).digest()[:4], 'little') % 1000
     return value < fraction * 1000
 
 
 def q3_evidence(pairs):
-    """Pares casi idénticos y entidades que repiten (≤ 30 días) que sobreviven a una muestra."""
+    """Pares casi idénticos y entidades que repiten (≤ 30 días) que sobreviven a una muestra.
+
+    Dos diseños: procesos al azar (un par sobrevive si entran sus dos procesos, ≈ p²) y
+    entidades completas al azar (un par de la misma entidad sobrevive con probabilidad p;
+    uno entre entidades distintas, solo si entran las dos, ≈ p²).
+    """
     if pairs is None or pairs.empty:
         return []
-    short = pairs[pairs.kind == 'misma entidad, <= 30 días']
-    buyers = short.left_buyer_id.nunique()
+    same = pairs.left_buyer_id == pairs.right_buyer_id
+    short = pairs.kind == 'misma entidad, <= 30 días'
+    buyers = pairs[short].left_buyer_id.nunique()
+    designs = {'aleatorio': ('left', 'right'), 'conglomerados': ('left_buyer_id', 'right_buyer_id')}
     rows = []
-    for fraction in FRACTIONS:
-        both = pairs.left.map(lambda o: kept(o, fraction)) & pairs.right.map(lambda o: kept(o, fraction))
-        short_both = both[short.index]
-        rows.append(
-            dict(
-                fraction=fraction,
-                pairs_full=len(pairs),
-                pairs_kept=int(both.sum()),
-                pairs_kept_share=float(both.mean()),
-                expected_share=fraction**2,
-                repeating_buyers_full=int(buyers),
-                repeating_buyers_detected=int(short[short_both].left_buyer_id.nunique()),
+    for design, (left, right) in designs.items():
+        for fraction in FRACTIONS:
+            both = pairs[left].map(lambda k: kept(k, fraction)) & pairs[right].map(lambda k: kept(k, fraction))
+            rows.append(
+                dict(
+                    design=design,
+                    fraction=fraction,
+                    pairs_full=len(pairs),
+                    pairs_kept=int(both.sum()),
+                    pairs_kept_share=float(both.mean()),
+                    expected_share=fraction**2 if design == 'aleatorio' else None,
+                    same_buyer_kept_share=float(both[same].mean()),
+                    cross_buyer_full=int((~same).sum()),
+                    cross_buyer_kept_share=float(both[~same].mean()) if (~same).any() else None,
+                    repeating_buyers_full=int(buyers),
+                    repeating_buyers_detected=int(pairs[short & both].left_buyer_id.nunique()),
+                )
             )
-        )
     return rows
 
 
 def q1_evidence(effect):
     if effect is None or effect.empty:
         return []
-    full = effect[effect.fraction == 1.0].set_index('year')
+    if 'design' not in effect:  # mediciones anteriores: solo diseño aleatorio
+        effect = effect.assign(design=effect.fraction.map(lambda f: 'todos' if f >= 1 else 'aleatorio'))
+    full = effect[effect.design == 'todos'].set_index('year')
     rows = []
-    for _, r in effect[effect.fraction < 1.0].iterrows():
+    for _, r in effect[effect.design != 'todos'].iterrows():
         base = full.loc[r.year]
         rows.append(
             dict(
+                design=r.design,
                 fraction=r.fraction,
                 year=int(r.year),
                 buyers_full=int(base.buyers_evaluable),
@@ -86,6 +100,8 @@ def q1_evidence(effect):
                 high_share_full=base.high_share,
                 high_share_sample=r.high_share,
                 same_top_supplier=r.same_top_supplier,
+                high_recall=r.get('high_recall'),
+                high_precision=r.get('high_precision'),
             )
         )
     return rows
@@ -132,8 +148,9 @@ def build():
             task='Concentración HHI',
             question='Q1',
             data=everything,
-            reason='El HHI por entidad necesita todas sus adjudicaciones: con una muestra muchas entidades no '
-            'llegan al mínimo y el HHI se infla (ver evidencia).',
+            reason='El HHI por entidad necesita todas sus adjudicaciones: con procesos al azar muchas entidades '
+            'no llegan al mínimo y el HHI se infla; con entidades completas el HHI es exacto pero solo se '
+            'encuentra una fracción p de las entidades concentradas (ver evidencia).',
             seconds=step_seconds(part1, 'concentración (Q1)'),
             engine='Spark',
         ),
@@ -149,8 +166,8 @@ def build():
             task='MinHash + LSH sobre el corpus',
             question='Q3',
             data=f"todos ({similarity.get('full_corpus', {}).get('documents', 0):,} con texto)".replace(',', ' '),
-            reason='Con una muestra del p % solo sobrevive el p² de los pares: las repeticiones desaparecen '
-            '(ver evidencia).',
+            reason='Con procesos al azar sobrevive el p² de los pares; con entidades completas, el p de las '
+            'repeticiones de una entidad y el p² de las que cruzan entidades (ver evidencia).',
             seconds=step_seconds(part2, 'LSH sobre el corpus completo', 'requerimientos repetidos (Q3)'),
             engine='Spark',
         ),
