@@ -22,6 +22,9 @@ def test_ocds_to_partitioned_parquet(tmp_path,monkeypatch):
         row=df.filter("ocid = 'a'").first(); assert row.tender_amount_pen==200
         usd=df.filter("ocid = 'usd'").first(); assert usd.award_amount_pen==190 and usd.award_converted_count==1
         usd_zero=df.filter("ocid = 'usd-zero'").first(); assert usd_zero.award_amount_pen==38 and usd_zero.award_unconverted_count==0
+        # La conversión histórica debe registrar método y tasa, no solo el monto.
+        award=spark.read.parquet(str(tmp_path/'processed'/'awards')).filter("ocid = 'usd-zero'").first()
+        assert award.conversion_method=='oece_daily_median_rate' and award.exchange_rate==3.8 and award.amount_pen==38
         suppliers=spark.read.parquet(str(tmp_path/'processed'/'suppliers')).collect()
         assert len(suppliers)==4 and sum(r.allocated_amount_pen for r in suppliers)==428
     finally: spark.stop()

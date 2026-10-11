@@ -1,5 +1,7 @@
 import json
 import os
+import time
+from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime, timezone
 from src.config import ARTIFACTS, PROCESSED, SEED
@@ -7,6 +9,26 @@ from src.config import ARTIFACTS, PROCESSED, SEED
 
 def now():
     return datetime.now(timezone.utc).isoformat()
+
+
+class StepTimer:
+    """Mide la duración de subetapas y la guarda como artefacto.
+
+    Spark es perezoso: solo se mide algo real si el bloque contiene una acción
+    (write, count, collect). Los tiempos sirven para discutir qué partes se
+    benefician de Spark (Parte VI).
+    """
+
+    def __init__(self):
+        self.steps = []
+
+    @contextmanager
+    def step(self, name):
+        start = time.perf_counter()
+        yield
+        seconds = time.perf_counter() - start
+        self.steps.append(dict(step=name, seconds=round(seconds, 2)))
+        print(f'  {name}: {seconds:.1f}s', flush=True)
 
 
 def save_json(name, value):
