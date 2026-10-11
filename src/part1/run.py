@@ -18,13 +18,14 @@ Artefactos (artifacts/eda/):
 
 from pyspark.sql import functions as F
 
-from src.common import StepTimer, save_csv, save_json
+from src.common import StepTimer, experiment, save_csv, save_json
 from src.common import processes as read_processes
 from src.config import PROCESSED, YEARS, spark_session
 from src.ingestion.validate_files import input_files
 from src.part1 import concentration, eda
 from src.part1.benchmark import run_benchmark
 from src.part1.partitioning import run_experiment
+from src.part1.sampling import sampling_effect
 from src.part1.spark_vs_pandas import run_comparison
 
 
@@ -85,22 +86,41 @@ def run(spark):
         )
         buyer_hhi.unpersist()
 
+    # Mediciones de una vez (ver src/common.py: experiment): se repiten o se reutilizan según RUN_EXPERIMENTS.
     with timer.step('RDD frente a DataFrame'):
-        # Las operaciones del benchmark hacen su propio join con el departamento: tabla original.
-        results, plans, snippets = run_benchmark(processes, raw_suppliers)
-        save_csv('eda/rdd_dataframe_benchmark.csv', results)
-        save_json('eda/execution_plans.json', plans)
-        save_json('eda/code_snippets.json', snippets)
+
+        def benchmark():
+            # Las operaciones del benchmark hacen su propio join con el departamento: tabla original.
+            results, plans, snippets = run_benchmark(processes, raw_suppliers)
+            save_csv('eda/rdd_dataframe_benchmark.csv', results)
+            save_json('eda/execution_plans.json', plans)
+            save_json('eda/code_snippets.json', snippets)
+
+        experiment('rdd_vs_dataframe', ['eda/rdd_dataframe_benchmark.csv', 'eda/code_snippets.json'], benchmark)
+    with timer.step('efecto de muestrear la Q1'):
+        experiment(
+            'muestreo_q1',
+            ['eda/sampling_effect.csv'],
+            lambda: save_csv('eda/sampling_effect.csv', sampling_effect(suppliers)),
+        )
 
     processes.unpersist()
     suppliers.unpersist()
     with timer.step('experimento de particionamiento'):
-        save_json(
-            'eda/partitioning_experiment.json',
-            run_experiment(spark, [str(p) for p in input_files()], YEARS[len(YEARS) // 2]),
+        experiment(
+            'particionamiento',
+            ['eda/partitioning_experiment.json'],
+            lambda: save_json(
+                'eda/partitioning_experiment.json',
+                run_experiment(spark, [str(p) for p in input_files()], YEARS[len(YEARS) // 2]),
+            ),
         )
     with timer.step('Spark frente a pandas'):
-        save_csv('eda/spark_vs_pandas.csv', run_comparison(spark))
+        experiment(
+            'spark_vs_pandas',
+            ['eda/spark_vs_pandas.csv'],
+            lambda: save_csv('eda/spark_vs_pandas.csv', run_comparison(spark)),
+        )
     save_json('eda/part1_timings.json', timer.steps)
 
 
