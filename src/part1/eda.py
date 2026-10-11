@@ -11,7 +11,8 @@ Cobertura del EDA exigido por el enunciado:
 - Montos: histograma en escala logarítmica y percentiles por año y categoría (los
   montos públicos tienen colas muy largas; la media sola engaña).
 - Frecuencia de entidades y proveedores: rankings en concentration.py.
-- Pregunta Q2: tasa de procesos con un solo postor por cada dimensión.
+- Pregunta Q2: tasa de procesos con un solo postor por cada dimensión, y qué cuenta el
+  número de postores (bidders_by_modality).
 """
 
 from pyspark.sql import functions as F
@@ -129,6 +130,30 @@ def amount_outliers(processes):
         F.sum(F.when(~F.col('extreme_amount'), F.col('tender_amount_pen'))).alias('tender_amount_without_extremes'),
         F.expr('percentile_approx(tender_amount_pen, 0.5)').alias('median_tender_amount'),
         F.max('tender_amount_pen').alias('max_tender_amount'),
+    )
+
+
+def bidders_by_modality(processes):
+    """¿Qué cuenta tender.numberOfTenderers? Distribución del número de postores por modalidad.
+
+    El OCDS del OECE no publica ofertas (bids) y su documentación no define el campo. Una
+    mediana de 9 en Adjudicación Simplificada y máximos de cientos son más compatibles con
+    participantes registrados que con ofertas presentadas: entonces "un postor" significa
+    "un solo participante" y la tasa de postor único es una cota inferior de la tasa de
+    procesos con una sola oferta.
+    """
+    known = processes.filter(F.col('bidders').isNotNull() & (F.col('bidders') >= 1))
+    return (
+        known.groupBy('modality')
+        .agg(
+            F.count('*').alias('processes'),
+            F.expr('percentile_approx(bidders, 0.5)').alias('median'),
+            F.expr('percentile_approx(bidders, 0.9)').alias('p90'),
+            F.max('bidders').alias('max'),
+            F.avg((F.col('bidders') == 1).cast('int')).alias('single_share'),
+            F.avg((F.col('bidders') >= 10).cast('int')).alias('ten_or_more_share'),
+        )
+        .orderBy(F.desc('processes'))
     )
 
 

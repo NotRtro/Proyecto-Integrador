@@ -264,6 +264,7 @@ def competition(dimension: str = "modality", year: str = "Todos"):
             "rules": optional_records("association/single_bidder_rules.csv"),
             "dgim": records(dgim[dgim.signal == "postor_unico"]),
             "dgim_series": records(series[series.signal == "postor_unico"]),
+            "bidders": optional_records("eda/bidders_by_modality.csv"),
         }
 
     return safe(build)

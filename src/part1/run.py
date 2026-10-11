@@ -50,6 +50,7 @@ def run(spark):
         export('amount_percentiles', eda.amount_percentiles(processes))
         export('amount_outlier_summary', eda.amount_outliers(processes))
         export('single_bidder_rates', eda.single_bidder_rates(processes))
+        export('bidders_by_modality', eda.bidders_by_modality(processes))
         # La categoría viene del proceso; se agrega aquí porque supplier_frame solo trae contexto geográfico.
         suppliers_with_category = suppliers.join(processes.select('ocid', 'category'), 'ocid', 'left')
         supplier_cube = suppliers_with_category.groupBy(

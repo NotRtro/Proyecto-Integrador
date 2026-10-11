@@ -52,12 +52,15 @@ export default function Competition() {
         </Card>
       </div>
       <DataTable rows={rates.map(r => ({ grupo: r.value, procesos: r.processes, informados: r.informed, 'un postor': r.single_bidder, tasa: percent(r.single_bidder_rate), 'sin dato': percent(r.missing_share) }))} />
+      {d.bidders?.length > 0 && <Card title="¿Qué cuenta el número de postores?" subtitle="tender.numberOfTenderers por modalidad: valores tan altos corresponden a participantes registrados, no a ofertas">
+        <DataTable rows={d.bidders.map(r => ({ modalidad: r.modality, procesos: r.processes, mediana: r.median, p90: r.p90, máximo: r.max, 'un participante': percent(r.single_share), '10 o más': percent(r.ten_or_more_share) }))} limit={12} />
+      </Card>}
     </FindingModule>
 
     <FindingModule id="q2-reglas" part="Parte V · reglas dirigidas" question="¿Qué combinaciones de características elevan la probabilidad de tener un solo postor?"
       pipeline={[['Canastas por proceso', 'Spark', 'categoría, modalidad, departamento, monto, postores, nivel'], ['Sin modalidades no competitivas', 'Spark', 'más de 50 % de postor único: directa, internacional, convenios…'], ['FP-Growth (soporte 0,2 %)', 'Spark'], ['Reglas A → POSTORES=uno', 'local', 'lift frente a la tasa base']]}>
       <Card title="Combinaciones que elevan el postor único" subtitle="Lift = cuántas veces más probable que la tasa base, solo en modalidades competitivas">
-        <DataTable rows={single.map(r => ({ combinación: r.antecedent, procesos: r.antecedent_count, 'con un postor': r.count, confianza: percent(r.confidence), 'tasa base': percent(r.base_rate), lift: decimal(r.lift), tipo: r.kind }))} />
+        <DataTable rows={single.map(r => ({ combinación: r.antecedent, procesos: r.antecedent_count, 'con un postor': r.count, confianza: percent(r.confidence), 'tasa base': percent(r.base_rate), lift: decimal(r.lift), improvement: r.improvement == null ? '—' : percent(r.improvement, 2), tipo: r.kind }))} />
       </Card>
       <Card title="Contraste: combinaciones con cuatro o más postores" subtitle="Dónde la competencia es más intensa">
         <DataTable rows={contrast.map(r => ({ combinación: r.antecedent, procesos: r.antecedent_count, confianza: percent(r.confidence), lift: decimal(r.lift) }))} />
