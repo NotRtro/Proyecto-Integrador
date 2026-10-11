@@ -58,8 +58,8 @@ Fase 0 Cimientos ─► Fase 1 Capa de datos ─► Fases 2–6 Partes I–V ─
 |---|---|---|---|
 | [x] 0.1 | C-03 | `download.py` descarga de verdad los `.jsonl.gz` 2023–2025 del registro OCDS (publicación 135), con reintentos, reanudación y SHA-256. Los datos van a `data/raw/` y `docker-compose.yml` monta `./data/raw` en lugar de la raíz del repo. | `python -m src.ingestion.download` deja los 3 archivos y `validate_files` pasa |
 | [x] 0.2 | — | `scripts/make_dev_sample.py` toma N líneas por año y las deja en `data/raw_dev/`. La variable `RAW_PATH` permite elegir completo o muestra. | `run_all` termina sobre la muestra en menos de 10 min |
-| [ ] 0.3 | B-01, B-02, B-03, VI-07 | Corregir la carga infinita en Ann y Similarity cuando la API falla. Quitar "198 mil" y los años escritos en el código: un endpoint `/api/meta` entrega años y totales. | Con la API caída, la página muestra el error. No quedan cifras ni años fijos en `frontend/src` |
-| [ ] 0.4 | B-04, V-05 | `test_api.py` valida invariantes (rangos, no vacío, `found >= 8` o estado `insufficient_evidence`) en lugar de cantidades exactas. | `make test` pasa con artefactos de la muestra |
+| [x] 0.3 | B-01, B-02, B-03, VI-07 | Corregir la carga infinita en Ann y Similarity cuando la API falla. Quitar "198 mil" y los años escritos en el código: un endpoint `/api/meta` entrega años y totales. | Con la API caída, la página muestra el error. No quedan cifras ni años fijos en `frontend/src` |
+| [x] 0.4 | B-04, V-05 | `test_api.py` valida invariantes (rangos, no vacío, `found >= 8` o estado `insufficient_evidence`) en lugar de cantidades exactas. | `make test` pasa con artefactos de la muestra |
 | [ ] 0.5 | — | Corrida base completa con el código actual, guardando una copia de `artifacts/` como referencia para comparar después. | `run_manifest.status == complete` |
 
 ### Fase 1: Capa de datos (`src/processing`)
