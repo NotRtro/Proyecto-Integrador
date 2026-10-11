@@ -15,4 +15,7 @@ COPY src src
 COPY tests tests
 COPY scripts scripts
 COPY pytest.ini .
+# Commit del código (make build lo pasa); el contenedor no tiene .git para consultarlo.
+ARG CODE_VERSION=uncommitted
+ENV CODE_VERSION=$CODE_VERSION
 CMD ["python", "-m", "src.run_all"]

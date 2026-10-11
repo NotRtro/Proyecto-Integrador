@@ -2,6 +2,8 @@ x-pipeline: &pipeline
   build:
     context: .
     dockerfile: Dockerfile.pipeline
+    args:
+      CODE_VERSION: ${CODE_VERSION:-uncommitted}
   image: oece-pipeline:local
   volumes:
     # DATA_DIR contiene raw/ y processed/; download.py escribe en raw/.

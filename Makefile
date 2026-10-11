@@ -1,7 +1,7 @@
 .PHONY: all build up download run test down dev-sample dev
 all: build up download run
 build:
-	docker compose build
+	CODE_VERSION=$$(git rev-parse --short HEAD) docker compose build
 up:
 	docker compose up -d --wait spark-master spark-worker-1 spark-worker-2 api web
 download:
