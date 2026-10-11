@@ -17,3 +17,9 @@ STOP = set('de del la las el los y o en para por con un una al a se que su'.spli
 def normalize_text(text):
     text = unicodedata.normalize('NFKD', text or '').encode('ascii', 'ignore').decode().lower()
     return ' '.join(t for t in re.findall(r'[a-z0-9]+', text) if t not in STOP and len(t) > 1)
+
+
+def normalize_label(text):
+    """Etiqueta en mayúsculas y sin tildes que conserva todas las palabras (p. ej. LA LIBERTAD)."""
+    text = unicodedata.normalize('NFKD', text or '').encode('ascii', 'ignore').decode().upper()
+    return ' '.join(re.findall(r'[A-Z0-9]+', text))

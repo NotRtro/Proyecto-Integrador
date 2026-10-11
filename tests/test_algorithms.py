@@ -7,12 +7,19 @@ from src.part4.dgim import DGIM
 from src.part5.apriori import apriori
 from src.part5.transactions import transaction
 from src.processing.model import amount_pen, converted_amount, effective_date, flatten
-from src.processing.normalize_text import normalize_text
+from src.processing.normalize_text import normalize_label, normalize_text
 
 
 def test_normalization():
     assert normalize_text('Adquisición de ÚTILES, para la oficina') == 'adquisicion utiles oficina'
     assert normalize_text('a') == ''
+
+
+def test_department_label_keeps_every_word():
+    assert normalize_label('La Libertad') == 'LA LIBERTAD'
+    assert normalize_label('MADRE DE DIOS') == 'MADRE DE DIOS'
+    assert normalize_label('Áncash') == 'ANCASH'
+    assert normalize_label(None) == ''
 
 
 def test_text_excludes_tender_code():

@@ -19,7 +19,7 @@ import math
 from datetime import datetime
 
 from src.processing.entity_level import buyer_level
-from src.processing.normalize_text import normalize_text
+from src.processing.normalize_text import normalize_label, normalize_text
 
 EXTREME_AMOUNT = 1_000_000_000
 
@@ -156,7 +156,7 @@ def requirement_text(tender, items):
 def buyer_department(record, buyer):
     """Departamento del domicilio del comprador (no necesariamente del lugar de ejecución)."""
     address = next(((p.get('address') or {}) for p in record.get('parties', []) if p.get('id') == buyer.get('id')), {})
-    return normalize_text(address.get('department') or address.get('region')).upper() or None
+    return normalize_label(address.get('department') or address.get('region')) or None
 
 
 def item_rows(base, items, date):
