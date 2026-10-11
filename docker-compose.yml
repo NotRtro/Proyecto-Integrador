@@ -24,7 +24,7 @@ x-pipeline: &pipeline
     PYSPARK_SUBMIT_ARGS: --driver-memory ${SPARK_DRIVER_MEMORY:-2g} pyspark-shell
     SAMPLE_SIZE: ${SAMPLE_SIZE:-1500}
     APRIORI_SAMPLE_SIZE: ${APRIORI_SAMPLE_SIZE:-10000}
-    # Perfil y experimentos (docs/DecisionesTecnicas.md); vacío = valores por defecto.
+    # Perfil y experimentos (la web, Datos y KDD → Decisiones de volumen); vacío = valores por defecto.
     RUN_PROFILE: ${RUN_PROFILE:-}
     RUN_EXPERIMENTS: ${RUN_EXPERIMENTS:-}
 services:

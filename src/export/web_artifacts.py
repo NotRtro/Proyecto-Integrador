@@ -129,7 +129,7 @@ def analytic_checks():
 
 
 def run():
-    # Tabla de decisiones de volumen con cifras de esta corrida (docs/DecisionesTecnicas.md).
+    # Tabla de decisiones de volumen con cifras de esta corrida (la web, Datos y KDD → Decisiones de volumen).
     save_json('metadata/data_decisions.json', decisions.build())
     missing = [p for p in REQUIRED if not (ARTIFACTS / p).is_file()]
     if missing:

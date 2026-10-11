@@ -1,4 +1,4 @@
-"""¿Qué se pierde si la Q1 se responde con una muestra? (evidencia de docs/DecisionesTecnicas.md)
+"""¿Qué se pierde si la Q1 se responde con una muestra? (evidencia de las decisiones de volumen)
 
 Motor: Spark. Se repite el HHI por entidad sobre muestras del 30 % y del 10 % y se
 compara con el resultado sobre todos los datos. Dos diseños de muestra, ambos

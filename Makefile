@@ -8,7 +8,7 @@ download:
 	docker compose run --rm --no-deps pipeline python -m src.ingestion.download
 run:
 	docker compose run --rm pipeline python -m src.run_all
-# Corrida de trabajo: ANN sobre 50 mil procesos y mediciones reutilizadas (docs/DecisionesTecnicas.md).
+# Corrida de trabajo: ANN sobre 50 mil procesos y mediciones reutilizadas (la web, Datos y KDD → Decisiones de volumen).
 rapido:
 	docker compose run --rm pipeline python -m src.run_all --profile rapido
 test:

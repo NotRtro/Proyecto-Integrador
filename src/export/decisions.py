@@ -2,7 +2,8 @@
 
 Motor: local (lee artefactos pequeños). Se arma al final de cada corrida con cifras
 reales —tamaños, tiempos y la evidencia de qué se pierde al muestrear— para que la
-justificación de docs/DecisionesTecnicas.md no dependa de números escritos a mano.
+justificación que muestra la web (Datos y KDD → Decisiones de volumen) no dependa de números
+escritos a mano.
 
 Artefacto: metadata/data_decisions.json.
 """

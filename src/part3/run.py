@@ -217,7 +217,7 @@ def run(spark):
     timer = StepTimer()
     with timer.step('lectura y vectorización TF-IDF + SVD'):
         # Orden pseudoaleatorio reproducible: los prefijos del arreglo son submuestras aleatorias.
-        # El perfil rápido evalúa ANN sobre un prefijo de ese orden (docs/DecisionesTecnicas.md).
+        # El perfil rápido evalúa ANN sobre un prefijo de ese orden (decisiones de volumen).
         ordered = (
             read_features(spark)
             .filter(F.length('normalized_text') > 0)

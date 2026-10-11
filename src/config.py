@@ -9,7 +9,7 @@ SEED = int(os.getenv('RANDOM_SEED', '42'))
 SAMPLE = int(os.getenv('SAMPLE_SIZE', '1500'))
 APRIORI_SAMPLE = int(os.getenv('APRIORI_SAMPLE_SIZE', '10000'))
 
-# Perfiles de ejecución (docs/DecisionesTecnicas.md). Lo que responde Q1-Q3 usa siempre
+# Perfiles de ejecución (la web, Datos y KDD → Decisiones de volumen). Lo que responde Q1-Q3 usa siempre
 # todos los datos; el perfil solo cambia la evaluación de ANN (Parte III), que es una
 # comparación de algoritmos y no necesita el corpus completo para sostener su conclusión.
 PROFILES = {

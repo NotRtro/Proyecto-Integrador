@@ -1,6 +1,6 @@
 """Orquestador del pipeline completo (etapas en orden, con manifiesto de la corrida).
 
-Opciones de volumen y tiempo (docs/DecisionesTecnicas.md):
+Opciones de volumen y tiempo (la web, Datos y KDD → Decisiones de volumen):
     --profile completo|rapido   rapido evalúa ANN sobre 50 mil procesos; Q1-Q3 siempre con todo
     --experiments si|no|auto    mediciones de una vez: repetir, omitir o solo si faltan
     --refresh                   ignorar las cachés de validación y de staging
