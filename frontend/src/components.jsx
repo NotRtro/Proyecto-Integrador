@@ -101,11 +101,14 @@ export function narrative(id) {
 }
 
 function inline(text) {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
-    part.startsWith('**') && part.endsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong> : part)
+  return text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) return <strong key={i}>{inline(part.slice(2, -2))}</strong>
+    if (part.length > 1 && part.startsWith('`') && part.endsWith('`')) return <code key={i}>{part.slice(1, -1)}</code>
+    return part
+  })
 }
 
-// Markdown mínimo: párrafos, listas con "- ", subtítulos "### " y **negritas**.
+// Markdown mínimo: párrafos, listas con "- ", subtítulos "### ", **negritas** y `código`.
 export function Markdown({ text }) {
   const blocks = text.trim().split(/\n\s*\n/)
   return <div className="markdown">{blocks.map((block, i) => {

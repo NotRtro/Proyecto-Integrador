@@ -35,10 +35,14 @@ export default function Discussion() {
     { técnica: `LSH (b = ${bestLsh?.bands}, r = ${bestLsh?.rows})`, exacta: 'todos los pares', pérdida: `recall ${percent(bestLsh?.recall)} · precisión ${percent(bestLsh?.precision)}`, ganancia: `${integer(corpus.candidate_pairs)} candidatos en vez de ${integer(corpus.possible_pairs)} pares` },
     { técnica: `HNSW (${hnsw.config})`, exacta: 'fuerza bruta', pérdida: `recall@10 ${percent(hnsw.recall_at_10)} (IC ${percent(hnsw.recall_at_10_ci_low)}–${percent(hnsw.recall_at_10_ci_high)})`, ganancia: `${decimal(hnsw.speedup, 0)}× más rápida por consulta` },
     { técnica: `IVF (${ivf.config})`, exacta: 'fuerza bruta', pérdida: `recall@10 ${percent(ivf.recall_at_10)}`, ganancia: `${decimal(ivf.speedup, 0)}× más rápida; construcción ${decimal(ivf.build_seconds, 1)} s` },
-    { técnica: `Bloom (${bytes(bloom.bytes)}, k = ${bloom.hashes})`, exacta: 'conjunto de pares', pérdida: `FPR observado ${percent(bloom.observed_fpr, 2)}, sin falsos negativos`, ganancia: `${bytes(bloom.bytes)} frente a ${bytes(bloom.exact_bytes)}` },
+    { técnica: `Bloom (${bytes(bloom.bytes)}, k = ${bloom.hashes})`, exacta: 'conjunto de pares', pérdida: `FPR final ${percent(bloom.final_fpr ?? bloom.observed_fpr, 2)} (en el flujo ${percent(bloom.observed_fpr, 2)}), sin falsos negativos`, ganancia: `${bytes(bloom.bytes)} frente a ${bytes(bloom.exact_bytes)}` },
     { técnica: `Count-Min (${cms.width} × ${cms.depth})`, exacta: 'diccionario de conteos', pérdida: `error relativo ${percent(cms.heavy_mean_relative_error)} en los 100 más frecuentes, ${percent(cms.tail_mean_relative_error)} en la cola`, ganancia: `${bytes(cms.bytes)} frente a ${bytes(cms.exact_bytes)}` },
     { técnica: `DGIM (${integer(dgim.window)} ${dgim.unit})`, exacta: 'ventana completa', pérdida: `error relativo final ${dgim.relative_error == null ? '—' : percent(dgim.relative_error)} (cota 50 %)`, ganancia: `${dgim.buckets} buckets frente a ${integer(dgim.window)} bits` },
   ]
+  // Con caché, la etapa de procesamiento del manifiesto dura segundos: para proyectar se usa
+  // la suma de sus subetapas medidas en la última ejecución real (metadata/processing_timings.json).
+  const processingSeconds = Math.max(d.run.stages.find(s => s.name === 'processing')?.seconds || 0,
+    d.processing_timings.reduce((t, s) => t + s.seconds, 0))
   const stages = d.run.stages.map(s => ({ etapa: s.name, motor: ENGINE[s.name] || '—', segundos: decimal(s.seconds, 1), participación: percent(s.seconds / d.run.stages.reduce((t, x) => t + x.seconds, 0)) }))
   const scaling = d.ann_scaling
   const fit = scaling.length > 1 ? linearFit(scaling.map(r => ({ x: r.corpus_size, y: r.exact_mean_ms }))) : null
@@ -48,7 +52,7 @@ export default function Discussion() {
     'búsqueda exacta / consulta': ms(fit.intercept + fit.slope * n * f),
     'matriz de vectores': bytes(scaling.at(-1).exact_matrix_mb * 1e6 * f),
     'pares posibles (LSH evita)': integer((n * f) * (n * f - 1) / 2),
-    'procesamiento Spark (lineal)': `${decimal(d.run.stages.find(s => s.name === 'processing')?.seconds * f / 60, 0)} min`,
+    'procesamiento Spark (lineal)': `${decimal(processingSeconds * f / 60, 0)} min`,
   })) : []
   const spark = d.spark_vs_pandas.at(-1)
   const suppliers = d.quality.suppliers?.types || {}
@@ -75,7 +79,7 @@ export default function Discussion() {
         <Card title="Duración de cada etapa del pipeline" subtitle="Corrida completa sobre los datos reales"><DataTable rows={stages} /></Card>
         <Card title="Evidencia puntual" subtitle="Mediciones del propio proyecto">
           <div className="prose">
-            <p><strong>Parseo de JSON anidado:</strong> {integer(d.quality.raw_records)} documentos en {decimal(d.processing_timings[0]?.seconds, 0)} s repartidos entre los núcleos del clúster.</p>
+            <p><strong>Parseo de JSON anidado:</strong> {integer(d.quality.raw_records)} documentos en {decimal(d.processing_timings[0]?.seconds, 0)} s y el procesamiento completo (deduplicación, monedas y seis tablas Parquet) en {decimal(processingSeconds / 60, 1)} min, repartidos entre los núcleos del clúster. Con caché, las corridas siguientes lo reutilizan.</p>
             <p><strong>LSH sobre todo el corpus:</strong> firmas, buckets y verificación de {integer(corpus.candidate_pairs)} candidatos en {decimal(corpus.signatures_seconds + corpus.buckets_seconds + corpus.candidates_seconds + corpus.verification_seconds, 0)} s.</p>
             {spark && <p><strong>Una agregación simple</strong> sobre {integer(spark.processes)} procesos: Spark {decimal(spark.spark_seconds, 2)} s frente a pandas {decimal(spark.pandas_seconds, 2)} s ({decimal(spark.pandas_memory_mb, 0)} MB en memoria). A este volumen, pandas gana.</p>}
           </div>
