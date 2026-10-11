@@ -22,12 +22,12 @@ import json
 
 import pandas as pd
 
-from src.common import StepTimer, save_csv, save_json
+from src.common import StepTimer, experiment, save_csv, save_json
 from src.common import features as read_features
 from src.common import processes as read_processes
 from src.config import ARTIFACTS, SAMPLE, SEED, spark_session
 from src.part2 import full_corpus, groups, repeated
-from src.part2.evaluation import ERROR_HASHES, MAX_HASHES, THRESHOLDS, evaluate
+from src.part2.evaluation import ERROR_HASHES, MAX_HASHES, REPLICATE_SEEDS, THRESHOLDS, evaluate, replicates
 from src.processing.text_features import DOMAIN_STOPWORD_DF, SHINGLE_WIDTH
 
 PAIR_COLUMNS = [
@@ -72,6 +72,7 @@ def methodology(result, summary):
             size=len(result['data']),
             buyers=result['buyers'],
             seed=SEED,
+            replicate_seeds=REPLICATE_SEEDS,
             truth_pairs_by_threshold=truth,
         ),
         minhash=dict(
@@ -101,6 +102,15 @@ def run(spark):
     with timer.step('evaluación en muestra (MinHash y rejilla LSH)'):
         result = evaluate(spark, features, SAMPLE)
         save_evaluation(result)
+
+    with timer.step('estabilidad de la rejilla LSH entre muestras'):
+
+        def measure():
+            rows, stability = replicates(spark, features, SAMPLE, result['grid'])
+            save_csv('similarity/lsh_replicates.csv', rows)
+            save_csv('similarity/lsh_stability.csv', stability)
+
+        experiment('lsh_replicates', ['similarity/lsh_replicates.csv', 'similarity/lsh_stability.csv'], measure)
 
     with timer.step('LSH sobre el corpus completo'):
         summary, similar, template_groups, cached = full_corpus.run_full_corpus(spark, features)

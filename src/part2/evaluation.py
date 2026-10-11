@@ -33,13 +33,13 @@ MAX_BUYER_SHARE = 0.2  # ninguna entidad aporta más del 20 % de la muestra
 EXPORT_PAIRS = 300  # pares por (configuración, estado) para la web
 
 
-def block_sample(features, size):
+def block_sample(features, size, seed=SEED):
     """Procesos de entidades completas elegidas por hash, hasta `size` documentos."""
     with_text = features.filter(F.size('shingles') > 0)
     buyers = (
         with_text.groupBy('buyer_id')
         .count()
-        .withColumn('h', F.sha2(F.concat(F.col('buyer_id'), F.lit(str(SEED))), 256))
+        .withColumn('h', F.sha2(F.concat(F.col('buyer_id'), F.lit(str(seed))), 256))
         .orderBy('h')
         .collect()
     )
@@ -53,7 +53,7 @@ def block_sample(features, size):
             break
     sample = (
         with_text.filter(F.col('buyer_id').isin(chosen))
-        .orderBy(F.sha2(F.concat(F.col('ocid'), F.lit(str(SEED))), 256))
+        .orderBy(F.sha2(F.concat(F.col('ocid'), F.lit(str(seed))), 256))
         .limit(size)
         .toPandas()
     )
@@ -215,9 +215,12 @@ def lsh_grid(spark, signatures, exact, n):
     return grid, curve, pairs
 
 
-def evaluate(spark, features, size):
-    """Corre toda la evaluación sobre la muestra por bloques."""
-    data, buyers = block_sample(features, size)
+def evaluate(spark, features, size, seed=SEED):
+    """Corre toda la evaluación sobre la muestra por bloques.
+
+    `seed` solo cambia qué entidades entran en la muestra; las funciones hash son las mismas.
+    """
+    data, buyers = block_sample(features, size, seed)
     shingle_sets = [list(s) for s in data.shingles]
     timings = {}
     start = time.perf_counter()
@@ -245,3 +248,43 @@ def evaluate(spark, features, size):
     return dict(
         data=data, buyers=buyers, error=error, scatter=scatter, grid=grid, curve=curve, pairs=pairs, timings=timings
     )
+
+
+REPLICATE_SEEDS = [SEED + i for i in range(1, 5)]
+
+
+def replicates(spark, features, size, base_grid):
+    """¿Cambia la rejilla LSH si la muestra por bloques toma otras entidades?
+
+    Repite la evaluación con otras semillas de muestreo (mismo diseño, mismas funciones
+    hash) y junta sus métricas con las de la muestra principal. Devuelve una fila por
+    muestra y configuración, y un resumen por configuración.
+    """
+    columns = ['config', 'hashes', 'bands', 'rows', 'threshold', 'precision', 'recall', 'f1', 'truth_pairs']
+    rows = [dict(seed=SEED, **{c: r[c] for c in columns}) for r in base_grid]
+    for seed in REPLICATE_SEEDS:
+        grid = evaluate(spark, features, size, seed)['grid']
+        rows += [dict(seed=seed, **{c: r[c] for c in columns}) for r in grid]
+    summary = {}
+    for row in rows:
+        summary.setdefault(row['config'], []).append(row)
+    stability = []
+    for config, group in summary.items():
+        f1 = np.array([r['f1'] for r in group], dtype=float)
+        recall = np.array([r['recall'] for r in group], dtype=float)
+        truth = [r['truth_pairs'] for r in group]
+        stability.append(
+            dict(
+                config=config,
+                samples=len(group),
+                f1_mean=float(np.nanmean(f1)),
+                f1_min=float(np.nanmin(f1)),
+                f1_max=float(np.nanmax(f1)),
+                f1_std=float(np.nanstd(f1)),
+                recall_min=float(np.nanmin(recall)),
+                recall_max=float(np.nanmax(recall)),
+                truth_pairs_min=int(min(truth)),
+                truth_pairs_max=int(max(truth)),
+            )
+        )
+    return rows, stability
