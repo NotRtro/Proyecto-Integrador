@@ -7,7 +7,7 @@ import os
 import subprocess
 import time
 import traceback
-from src.config import YEARS,SEED,SAMPLE,ANN_SAMPLE,APRIORI_SAMPLE,spark_session
+from src.config import YEARS,SEED,SAMPLE,APRIORI_SAMPLE,spark_session
 from src.common import save_json,now
 
 def main():
@@ -18,7 +18,7 @@ def main():
     code_hash=hashlib.sha256()
     for path in sorted(Path('src').rglob('*.py')):
         code_hash.update(str(path).encode()); code_hash.update(path.read_bytes())
-    manifest=dict(code_sha256=code_hash.hexdigest(), dependencies={p:importlib.metadata.version(p) for p in ['pyspark','numpy','pandas','hnswlib','scikit-learn']}, started_at=now(),status='running',code_version=revision,years=YEARS,seed=SEED,sample_size=SAMPLE,ann_sample=ANN_SAMPLE,apriori_sample=APRIORI_SAMPLE,stages=[])
+    manifest=dict(code_sha256=code_hash.hexdigest(), dependencies={p:importlib.metadata.version(p) for p in ['pyspark','numpy','pandas','faiss-cpu','scikit-learn']}, started_at=now(),status='running',code_version=revision,years=YEARS,seed=SEED,sample_size=SAMPLE,apriori_sample=APRIORI_SAMPLE,stages=[])
     spark=None; enabled=False
     try:
         for name,module in stages:
