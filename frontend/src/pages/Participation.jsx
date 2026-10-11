@@ -15,7 +15,7 @@ export default function Participation({ d }) {
   const chart = rows.slice(0, 15).map(r => ({ ...r, label: String(r.name || r.id).slice(0, 28), perdidas: r.participations - r.wins }))
   const bins = d.participation_bins.map(r => ({ ...r, ganan: r.providers - r.never_won }))
   return <FindingModule id="q2-participacion" part="Parte I · participación" question="¿Quiénes participan más, quiénes ganan más y quiénes participan una y otra vez sin ganar nunca?"
-    pipeline={[['tender.tenderers', 'Spark', 'participantes registrados por proceso'], ['suppliers', 'Spark', 'adjudicados'], ['Join por identificador', 'Spark', 'participaciones, victorias, tasa'], ['Rankings sin personas naturales', 'Spark']]}>
+    pipeline={[['tender.tenderers', 'Spark', 'participantes reportados por proceso'], ['suppliers', 'Spark', 'adjudicados'], ['Join por identificador', 'Spark', 'participaciones, victorias, tasa'], ['Rankings sin personas naturales', 'Spark']]}>
     <div className="stat-grid four">
       <Stat label="Proveedores que participan" value={integer(s.providers)} note={`en ${integer(s.processes_with_tenderers)} procesos`} />
       <Stat label="Nunca ganaron" value={percent(s.never_won_share)} note={`${integer(s.never_won)} proveedores`} tone="orange" />

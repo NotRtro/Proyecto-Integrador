@@ -13,7 +13,7 @@ Publicar "las entidades más dependientes" o "las que más repiten requerimiento
 **Los sesgos del registro se heredan.**
 
 - Los consorcios reciben el 51 % del monto con identificadores de un solo uso, así que la concentración real por empresa no es observable, y las conclusiones sobre concentración son cotas inferiores.
-- El número de postores son participantes registrados y falta en el 7–13 % de los procesos.
+- No está confirmado qué cuenta el número de postores (probablemente inscritos, no ofertas) y falta en el 7–13 % de los procesos.
 - El departamento es la sede del comprador. Las regiones donde ejecutan los ministerios quedan subrepresentadas.
 - Hay procesos registrados dos veces y un final de 2025 con cobertura incompleta.
 

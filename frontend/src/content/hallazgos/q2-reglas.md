@@ -21,4 +21,4 @@ Las variantes con categoría, monto bajo y nivel local se repiten en las 27 regl
 - **Revisar las subastas con un participante:** fichas técnicas demasiado específicas o lugares de entrega remotos.
 - **Abaratar la participación** en procesos de bajo valor (requisitos y garantías proporcionales al monto).
 
-**Límites.** Los lifts son moderados (1,4 a 3,0) y las confianzas bajas: ninguna combinación hace que el postor único sea probable, solo menos raro. "Postor" es un participante registrado, así que estas reglas describen dónde nadie más se inscribe, la forma más extrema de falta de competencia. Los casos con varios inscritos y una sola oferta válida quedan fuera del alcance de estos datos.
+**Límites.** Los lifts son moderados (1,4 a 3,0) y las confianzas bajas: ninguna combinación hace que el postor único sea probable, solo menos raro. "Postor" es el participante que reporta la fuente; si el campo cuenta inscritos, como parece, estas reglas describen dónde nadie más se inscribe. Los casos con varios inscritos y una sola oferta válida quedan fuera del alcance de estos datos.

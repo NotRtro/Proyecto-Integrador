@@ -4,4 +4,4 @@
 
 **¿Es aceptable el error de DGIM?** Sí, para este uso. Con ventanas de 1 000 eventos el error fue del 5 %, y con 10 000 del 14 %, en ambos casos por encima del valor real. Una alarma que se dispara cuando el conteo se duplica tolera un 15 % de error sin cambiar la decisión. Lo que no tolera es perder la señal, y DGIM no la pierde: el conteo estimado sigue de cerca la forma de la curva exacta.
 
-**Límite.** El bit "postor único" es el de la Q2: un solo participante registrado, y no se conoce en procesos sin dato. El flujo se ordena por la fecha de adjudicación, que no es la de convocatoria, así que la ventana describe cuándo se dieron las buenas pro, no cuándo se convocó.
+**Límite.** El bit "postor único" es el de la Q2: un solo participante reportado en la fuente, y no se conoce en procesos sin dato. El flujo se ordena por la fecha de adjudicación, que no es la de convocatoria, así que la ventana describe cuándo se dieron las buenas pro, no cuándo se convocó.
