@@ -19,6 +19,10 @@ Preguntas:
   pidió cada código UNSPSC? Decenas de miles de claves distintas.
 - DGIM (Q2): ¿cuántos procesos con un solo postor (o de alto monto) hubo en la ventana
   reciente? Ventanas de N eventos y de N días.
+
+Además, replay.py reproduce el mismo flujo con Spark Structured Streaming, una semana de
+adjudicaciones por micro-lote, para mostrar cómo evolucionan las estructuras a medida que
+llegan los datos.
 """
 
 import sys
@@ -29,12 +33,13 @@ from datetime import date
 import numpy as np
 from pyspark.sql import functions as F
 
-from src.common import StepTimer, save_csv, save_json
+from src.common import StepTimer, experiment, save_csv, save_json
 from src.common import processes as read_processes
 from src.config import PROCESSED, spark_session
 from src.part4.bloom_filter import BloomFilter, optimal_hashes, theoretical_fpr
 from src.part4.count_min_sketch import CountMinSketch, delta, epsilon
 from src.part4.dgim import DGIM
+from src.part4.replay import replay
 
 BLOOM_BITS = [2**17, 2**19, 2**21]
 BLOOM_HASHES = [3, 5, 7]
@@ -319,6 +324,16 @@ def run(spark):
     timer = StepTimer()
     with timer.step('flujo de adjudicaciones (Bloom, CMS proveedores, DGIM)'):
         result = process_awards(award_events(spark).toLocalIterator())
+    with timer.step('flujo semanal con Structured Streaming'):
+        # Medición de una vez: ~160 micro-lotes con su costo fijo cada uno (ver src/common.py: experiment).
+        def streaming_replay():
+            replay_batches, replay_summary = replay(spark, award_events(spark))
+            save_csv('streaming/replay_batches.csv', replay_batches)
+            save_json('streaming/replay_summary.json', replay_summary)
+
+        experiment(
+            'replay_streaming', ['streaming/replay_batches.csv', 'streaming/replay_summary.json'], streaming_replay
+        )
     with timer.step('flujo de ítems (CMS UNSPSC)'):
         item_sketches, item_counts, item_times = cms_items(item_events(spark).toLocalIterator())
 

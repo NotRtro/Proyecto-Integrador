@@ -67,3 +67,25 @@ def test_stream_bloom_compares_against_theory_at_same_occupancy(monkeypatch):
     assert row['final_fpr'] == pytest.approx(row['theoretical_fpr'], abs=0.02)
     # La ocupación crece durante el flujo: el promedio del flujo queda bajo el FPR final.
     assert row['expected_stream_fpr'] < row['theoretical_fpr']
+
+
+def test_replay_state_tracks_exact_and_approximate():
+    import pandas as pd
+
+    from src.part4.replay import ReplayState
+
+    class Batch:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def toPandas(self):
+            return pd.DataFrame(self.rows, columns=['event_date', 'buyer_id', 'supplier_id', 'single_bidder'])
+
+    state = ReplayState()
+    state.process(Batch([('2024-01-01', 'b1', 's1', True), ('2024-01-02', 'b1', 's1', False)]), 0)
+    state.process(Batch([('2024-03-01', 'b2', 's1', True), ('2024-03-02', 'b1', 's2', True)]), 1)
+    first, second = state.rows
+    assert first['new_pairs'] == 1 and first['bloom_fp'] == 0 and first['cms_top_exact'] == 2
+    assert second['cumulative_events'] == 4 and second['distinct_pairs'] == 3
+    assert second['dgim_exact'] == 2  # el bit de enero salió de la ventana de 30 días
+    assert second['cms_top_estimate'] >= second['cms_top_exact'] == 3
