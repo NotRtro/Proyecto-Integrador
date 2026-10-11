@@ -99,3 +99,26 @@ def test_scan_filters_distinguish_partition_pruning(spark, tmp_path):
     by_date = scan_filters(table.filter(F.col('effective_date').between('2024-01-01', '2024-12-31')))
     assert '2024' in by_partition['partition_filters'] and by_date['partition_filters'] == ''
     assert 'effective_date' in by_date['pushed_filters']
+
+
+def test_participation_counts_wins_and_never_won(spark):
+    from src.part1 import participation
+
+    tenderers = spark.createDataFrame(
+        [(f'p{i}', 'b1', 'A', 'Empresa A', 'persona_juridica') for i in range(3)]
+        + [(f'p{i}', 'b1', 'B', 'Empresa B', 'persona_juridica') for i in range(25)]
+        + [('p0', 'b1', 'N', 'Persona', 'persona_natural')],
+        'ocid string, buyer_id string, tenderer_id string, tenderer_name string, tenderer_type string',
+    )
+    suppliers = spark.createDataFrame(
+        [('p0', 'A', 100.0), ('p1', 'A', 50.0), ('p2', 'N', 10.0)],
+        'ocid string, supplier_id string, allocated_amount_pen double',
+    )
+    stats = {r['id']: r for r in participation.participation(tenderers, suppliers).collect()}
+    assert stats['A']['participations'] == 3 and stats['A']['wins'] == 2
+    assert stats['A']['win_rate'] == pytest.approx(2 / 3) and stats['A']['amount_won_pen'] == 150
+    assert stats['B']['wins'] == 0 and stats['B']['participations'] == 25
+    rankings = participation.participation_rankings(participation.participation(tenderers, suppliers)).collect()
+    never = [r['id'] for r in rankings if r['ranking'] == 'nunca_ganan']
+    assert never == ['B']  # 25 participaciones sin ganar (mínimo 20)
+    assert all(r['id'] != 'N' for r in rankings)  # personas naturales sin nombre en los rankings

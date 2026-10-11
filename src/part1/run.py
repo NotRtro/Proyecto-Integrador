@@ -12,6 +12,10 @@ Artefactos (artifacts/eda/):
     buyer_supplier_hhi.csv, buyer_hhi_summary.csv, department_supplier_hhi.csv   (Q1)
     top_buyers.csv, top_suppliers.csv          rankings con participación
     single_bidder_rates.csv                    tasa de postor único por dimensión (Q2)
+    bidders_by_modality.csv                    qué cuenta el número de postores
+    item_segments.csv, item_codes.csv, item_segments_by_year.csv, item_summary.json   frecuencia de ítems
+    participation_rankings.csv, participation_bins.csv, participation_summary.json
+                                               quién participa, quién gana y quién nunca gana (Q1, Q2)
     rdd_dataframe_benchmark.csv, execution_plans.json, code_snippets.json
     partitioning_experiment.json, spark_vs_pandas.csv
 """
@@ -22,7 +26,7 @@ from src.common import StepTimer, experiment, save_csv, save_json
 from src.common import processes as read_processes
 from src.config import PROCESSED, YEARS, spark_session
 from src.ingestion.validate_files import input_files
-from src.part1 import concentration, eda
+from src.part1 import concentration, eda, participation
 from src.part1.benchmark import run_benchmark
 from src.part1.partitioning import run_experiment
 from src.part1.sampling import sampling_effect
@@ -86,6 +90,20 @@ def run(spark):
             ),
         )
         buyer_hhi.unpersist()
+
+    with timer.step('frecuencia de ítems y participación'):
+        items = spark.read.parquet(str(PROCESSED / 'items'))
+        by_segment, by_code, by_year, item_summary = participation.item_frequency(spark, items)
+        export('item_segments', by_segment)
+        export('item_codes', by_code)
+        export('item_segments_by_year', by_year)
+        save_json('eda/item_summary.json', item_summary)
+        tenderers = spark.read.parquet(str(PROCESSED / 'tenderers'))
+        stats = participation.participation(tenderers, raw_suppliers).cache()
+        export('participation_rankings', participation.participation_rankings(stats))
+        export('participation_bins', participation.participation_bins(stats))
+        save_json('eda/participation_summary.json', participation.participation_summary(stats, tenderers))
+        stats.unpersist()
 
     # Mediciones de una vez (ver src/common.py: experiment): se repiten o se reutilizan según RUN_EXPERIMENTS.
     with timer.step('RDD frente a DataFrame'):
