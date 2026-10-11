@@ -53,8 +53,12 @@ export default function Competition() {
         </Card>
       </div>
       <DataTable rows={rates.map(r => ({ grupo: r.value, procesos: r.processes, informados: r.informed, 'un postor': r.single_bidder, tasa: percent(r.single_bidder_rate), 'sin dato': percent(r.missing_share) }))} />
-      {d.bidders?.length > 0 && <Card title="¿Qué cuenta el número de postores?" subtitle="tender.numberOfTenderers por modalidad: valores tan altos corresponden a participantes registrados, no a ofertas">
+      {d.bidders?.length > 0 && <Card title="¿Qué cuenta el número de postores?" subtitle="tender.numberOfTenderers por modalidad: valores tan altos son más compatibles con inscritos que con ofertas presentadas (hipótesis)">
         <DataTable rows={d.bidders.map(r => ({ modalidad: r.modality, procesos: r.processes, mediana: r.median, p90: r.p90, máximo: r.max, 'un participante': percent(r.single_share), '10 o más': percent(r.ten_or_more_share) }))} limit={12} />
+      </Card>}
+      {d.adjusted?.length > 0 && <Card title="¿Persiste la diferencia entre compras parecidas?" subtitle="Tasa de cada modalidad recalculada con la mezcla de categoría, departamento, año y banda de monto de las modalidades competitivas">
+        <DataTable rows={d.adjusted.filter(r => r.level === 'modalidad' && r.informed >= 1000).map(r => ({ modalidad: r.name, grupo: r.group, informados: r.informed, 'tasa observada': percent(r.raw_rate), 'tasa ajustada': r.adjusted_rate == null ? 'sin estratos comunes' : percent(r.adjusted_rate), 'mezcla cubierta': percent(r.strata_coverage) }))} limit={15} />
+        {d.persistence?.comparable_strata > 0 && <p className="scope">En {integer(d.persistence.strata_where_direct_is_higher)} de {integer(d.persistence.comparable_strata)} estratos comparables (al menos {d.persistence.min_processes_per_side} procesos informados por lado) la contratación directa tiene mayor tasa de un solo participante que las modalidades competitivas; la brecha mediana es de {decimal(d.persistence.median_gap * 100, 0)} puntos. Si la mezcla cubierta es baja, la tasa ajustada se apoya en pocos estratos.</p>}
       </Card>}
     </FindingModule>
 

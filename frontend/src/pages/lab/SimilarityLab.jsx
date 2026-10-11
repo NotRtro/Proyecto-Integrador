@@ -104,6 +104,10 @@ export function LshLab({ s }) {
     </div>
     {config && <PairBrowser config={config.config} />}
     <DataTable rows={s.grid.filter(r => r.threshold === threshold).map(r => ({ k: r.hashes, b: r.bands, r: r.rows, 'umbral efectivo': decimal(r.effective_threshold), precisión: percent(r.precision), recall: percent(r.recall), F1: decimal(r.f1, 3), candidatos: r.candidates, 'pares verdaderos': r.truth_pairs, 'tiempo LSH (s)': decimal(r.lsh_seconds) }))} />
+    {s.stability?.length > 0 && config && (() => {
+      const st = s.stability.find(r => r.config === config.config)
+      return st ? <p className="scope">Estabilidad de esta configuración en {st.samples} muestras por bloques con entidades distintas: F1 entre {decimal(st.f1_min)} y {decimal(st.f1_max)} (media {decimal(st.f1_mean)}), recall entre {percent(st.recall_min)} y {percent(st.recall_max)}, con {integer(st.truth_pairs_min)} a {integer(st.truth_pairs_max)} pares verdaderos por muestra. La tabla de arriba corresponde a la muestra principal.</p> : null
+    })()}
   </FindingModule>
 }
 

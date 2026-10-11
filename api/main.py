@@ -269,6 +269,8 @@ def competition(dimension: str = "modality", year: str = "Todos"):
             "dgim": records(dgim[dgim.signal == "postor_unico"]),
             "dgim_series": records(series[series.signal == "postor_unico"]),
             "bidders": optional_records("eda/bidders_by_modality.csv"),
+            "adjusted": optional_records("eda/single_bidder_adjusted.csv"),
+            "persistence": optional_document("eda/single_bidder_persistence.json", {}),
             "participation": optional_records("eda/participation_rankings.csv"),
             "participation_bins": optional_records("eda/participation_bins.csv"),
             "participation_summary": optional_document("eda/participation_summary.json", {}),
@@ -313,6 +315,7 @@ def similarity():
         return {
             "grid": records(grid),
             "default_config": grid.sort_values(["f1", "recall"], ascending=False).iloc[0]["config"],
+            "stability": optional_records("similarity/lsh_stability.csv"),
             "minhash_error": optional_records("similarity/minhash_error.csv"),
             "minhash_scatter": optional_records("similarity/minhash_scatter.csv"),
             "s_curve": optional_records("similarity/s_curve_observed.csv"),
