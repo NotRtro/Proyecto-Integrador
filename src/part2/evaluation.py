@@ -254,10 +254,11 @@ REPLICATE_SEEDS = [SEED + i for i in range(1, 5)]
 
 
 def replicates(spark, features, size, base_grid):
-    """¿Cambia la rejilla LSH si la muestra por bloques toma otras entidades?
+    """¿Cambia la rejilla LSH si la muestra por bloques se elige con otra semilla?
 
     Repite la evaluación con otras semillas de muestreo (mismo diseño, mismas funciones
-    hash) y junta sus métricas con las de la muestra principal. Devuelve una fila por
+    hash) y junta sus métricas con las de la muestra principal. Las muestras pueden compartir
+    entidades: mide la variabilidad del muestreo, no réplicas independientes. Devuelve una fila por
     muestra y configuración, y un resumen por configuración.
     """
     columns = ['config', 'hashes', 'bands', 'rows', 'threshold', 'precision', 'recall', 'f1', 'truth_pairs']

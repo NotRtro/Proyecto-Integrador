@@ -65,7 +65,7 @@ export default function Competition() {
     <Participation d={d} />
 
     <FindingModule id="q2-reglas" part="Parte V · reglas dirigidas" question="¿Qué combinaciones de características elevan la probabilidad de tener un solo postor?"
-      pipeline={[['Canastas por proceso', 'Spark', 'categoría, modalidad, departamento, monto, postores, nivel'], ['Sin modalidades no competitivas', 'Spark', 'más de 50 % de postor único: directa, internacional, convenios…'], ['FP-Growth (soporte 0,2 %)', 'Spark'], ['Reglas A → POSTORES=uno', 'local', 'lift frente a la tasa base']]}>
+      pipeline={[['Canastas por proceso', 'Spark', 'categoría, modalidad, departamento, monto, postores, nivel'], ['Filtro empírico de modalidades', 'Spark', 'se excluyen las de más de 50 % de postor único: directa, internacional, convenios…'], ['FP-Growth (soporte 0,2 %)', 'Spark'], ['Reglas A → POSTORES=uno', 'local', 'lift frente a la tasa base']]}>
       <Card title="Combinaciones que elevan el postor único" subtitle="Lift = cuántas veces más probable que la tasa base, solo en modalidades competitivas">
         <DataTable rows={single.map(r => ({ combinación: r.antecedent, procesos: r.antecedent_count, 'con un postor': r.count, confianza: percent(r.confidence), 'tasa base': percent(r.base_rate), lift: decimal(r.lift), improvement: r.improvement == null ? '—' : percent(r.improvement, 2), tipo: r.kind }))} />
       </Card>

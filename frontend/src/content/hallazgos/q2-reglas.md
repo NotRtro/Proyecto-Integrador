@@ -1,7 +1,7 @@
 **Por qué reglas dirigidas.** Con soporte del 2 %, FP-Growth general nunca produce reglas sobre el postor único: en las modalidades competitivas solo el 1,6 % de los procesos lo tiene. Para la Q2 se minan entonces reglas con consecuente fijo `POSTORES=uno`, con soporte bajo (0,2 %, al menos 100 procesos) y con dos exclusiones:
 
 - los procesos sin dato de postores;
-- las modalidades donde más de la mitad tiene un solo participante por diseño (contratación directa e internacional, regímenes especiales, convenios, adjudicaciones selectivas), que se detectan con los datos y no a mano. Incluirlas solo redescubriría que la contratación directa tiene un solo proveedor.
+- las modalidades donde más de la mitad de los procesos tiene un solo participante (contratación directa e internacional, regímenes especiales, convenios, adjudicaciones selectivas). Es un filtro empírico que se calcula con los datos: una tasa alta no demuestra que la modalidad esté diseñada sin competencia. La población resultante coincide con las modalidades competitivas de las señales (Q4) salvo por 82 procesos de modalidad "Otra". Incluirlas solo redescubriría que la contratación directa tiene un solo proveedor.
 
 Quedan 151 264 procesos competitivos con una tasa base de 1,6 %. Lo que importa no es la confianza, siempre baja, sino el **lift**: cuántas veces más probable es el postor único dentro de la combinación.
 

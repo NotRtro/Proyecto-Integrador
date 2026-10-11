@@ -12,8 +12,8 @@ Pasos:
    interpretar se eligen reglas informativas con improvement >= 5 puntos.
 3. Reglas dirigidas (Q2): ¿qué combinaciones elevan la probabilidad de tener un solo
    postor (y, como contraste, cuatro o más) donde debería haber competencia? Se minan
-   procesos con postores informados, sin las modalidades no competitivas por diseño
-   (más de 50 % de postor único) y con soporte bajo (0,2 %): los grupos son pequeños.
+   procesos con postores informados, sin las modalidades con más de 50 % de postor único
+   (filtro empírico) y con soporte bajo (0,2 %): los grupos son pequeños.
 4. Calidad: proporción de "sin dato" por atributo y año.
 5. Qué se compra junto: canastas de segmentos UNSPSC de los ítems de cada proceso con
    más de un segmento. Solo una minoría de procesos compra cosas de varios segmentos, así
@@ -171,9 +171,11 @@ def rules_by_year(raw_rules, tx, frequencies, total):
 def non_competitive_modalities(informed):
     """Modalidades donde más de la mitad de los procesos tiene un solo postor.
 
-    Son no competitivas por diseño (contratación directa, convenios, contratación
-    internacional, regímenes especiales): incluirlas en las reglas dirigidas solo
-    redescubriría que allí hay un único proveedor. Se calcula de los datos, no se fija a mano.
+    Filtro empírico (contratación directa, convenios, contratación internacional, regímenes
+    especiales): incluirlas en las reglas dirigidas solo redescubriría que allí suele haber un
+    único participante. Una tasa alta no demuestra que la modalidad esté diseñada sin
+    competencia. La población que queda coincide casi por completo con COMPETITIVE_MODALITIES
+    (src/processing/model.py); la diferencia es la modalidad "Otra".
     """
     modality = F.filter('items', lambda i: i.startswith('MODALIDAD='))[0]
     single = F.array_contains('items', 'POSTORES=uno').cast('int')
@@ -193,8 +195,8 @@ def non_competitive_modalities(informed):
 def single_bidder_rules(tx):
     """Reglas dirigidas a POSTORES=uno (y su contraste) donde debería haber competencia.
 
-    Se excluyen los procesos sin postores informados y los de modalidades no competitivas
-    por diseño (ver non_competitive_modalities).
+    Se excluyen los procesos sin postores informados y los de modalidades con más de la mitad
+    de sus procesos con un solo postor (ver non_competitive_modalities).
     """
     informed = tx.filter(~F.array_contains('items', f'POSTORES={MISSING}')).cache()
     excluded = non_competitive_modalities(informed)

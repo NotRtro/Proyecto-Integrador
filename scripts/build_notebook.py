@@ -149,9 +149,10 @@ check('EDA', 'Los ítems por segmento suman los ítems con código',
 md("""
 ### 2.2 Quién participa, quién gana y quién nunca gana
 
-**Qué se afirma.** `tender.tenderers` lista a los participantes registrados y todo adjudicado está entre ellos. Se
-cuentan participaciones y victorias por proveedor. *Participante* no es *oferta presentada*: inscribirse es gratuito,
-así que una tasa de victoria baja no significa perder la evaluación. Las personas naturales no aparecen con nombre.
+**Qué se afirma.** `tender.tenderers` lista a los participantes que reporta la fuente y todo adjudicado está entre ellos. Se
+cuentan participaciones y victorias por proveedor. Es probable que *participante* no equivalga a *oferta presentada*
+(inscribirse es gratuito), pero es una hipótesis: el estándar OCDS define el campo por las ofertas. Si se cumple, una
+tasa de victoria baja no significa perder la evaluación. Las personas naturales no aparecen con nombre.
 """)
 code("""
 ranks = csv('eda/participation_rankings.csv')
