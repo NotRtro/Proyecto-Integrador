@@ -15,9 +15,13 @@ Pasos:
    procesos con postores informados, sin las modalidades no competitivas por diseño
    (más de 50 % de postor único) y con soporte bajo (0,2 %): los grupos son pequeños.
 4. Calidad: proporción de "sin dato" por atributo y año.
+5. Qué se compra junto: canastas de segmentos UNSPSC de los ítems de cada proceso con
+   más de un segmento. Solo una minoría de procesos compra cosas de varios segmentos, así
+   que se mina con soporte relativo a esas canastas y un mínimo absoluto de procesos.
 
 Artefactos (artifacts/association/): algorithm_benchmark.csv, frequent_itemsets_*.csv,
-rules.csv, single_bidder_rules.csv, missing_report.csv, selected_rules.json.
+rules.csv, single_bidder_rules.csv, missing_report.csv, selected_rules.json,
+copurchase_itemsets.csv, copurchase_rules.csv, copurchase_summary.json.
 """
 
 import json
@@ -28,7 +32,8 @@ from pyspark.sql import functions as F
 
 from src.common import StepTimer, sample_processes, save_csv, save_json
 from src.common import features as read_features
-from src.config import APRIORI_SAMPLE, spark_session
+from src.config import APRIORI_SAMPLE, PROCESSED, spark_session
+from src.part1.participation import SEGMENTS
 from src.part5.apriori import apriori
 from src.part5.rules import automatic_reading, improvement, metrics_by_year, pick, rule_kind, targeted_rules
 from src.part5.transactions import ATTRIBUTES, MISSING, transaction
@@ -45,6 +50,8 @@ SELECTED_GENERAL = 5
 SELECTED_SINGLE_BIDDER = 5
 # Una regla general seleccionada debe superar en 5 puntos de confianza a toda sub-regla.
 MIN_IMPROVEMENT = 0.05
+COPURCHASE_MIN_COUNT = 30
+COPURCHASE_CONFIDENCE = 0.2
 
 
 def baskets(spark):
@@ -247,6 +254,62 @@ def select_rules(general, targeted):
     return chosen
 
 
+def copurchase(spark):
+    """FP-Growth sobre los segmentos UNSPSC que se compran en un mismo proceso."""
+    items = spark.read.parquet(str(PROCESSED / 'items')).filter(F.col('classification').isNotNull())
+    baskets = (
+        items.groupBy('ocid')
+        .agg(F.array_sort(F.collect_set(F.substring('classification', 1, 2))).alias('items'))
+        .filter(F.size('items') >= 2)
+        .cache()
+    )
+    total_processes = items.select('ocid').distinct().count()
+    n = baskets.count()
+    if n == 0:
+        return [], [], dict(processes_with_items=total_processes, multi_segment_baskets=0)
+    model = FPGrowth(itemsCol='items', minSupport=COPURCHASE_MIN_COUNT / n, minConfidence=COPURCHASE_CONFIDENCE).fit(
+        baskets
+    )
+    name = lambda codes: ' + '.join(SEGMENTS.get(c, f'Segmento {c}') for c in codes)  # noqa: E731
+    itemsets = [
+        dict(
+            items=' ∧ '.join(sorted(r['items'])),
+            names=name(sorted(r['items'])),
+            size=len(r['items']),
+            count=r['freq'],
+            support=r['freq'] / n,
+        )
+        for r in model.freqItemsets.collect()
+    ]
+    rules = [
+        dict(
+            antecedent=name(sorted(r['antecedent'])),
+            consequent=name(r['consequent']),
+            antecedent_codes=' ∧ '.join(sorted(r['antecedent'])),
+            consequent_codes=r['consequent'][0],
+            support=r['support'],
+            confidence=r['confidence'],
+            lift=r['lift'],
+        )
+        for r in model.associationRules.collect()
+    ]
+    sizes = baskets.select(F.size('items').alias('k')).groupBy('k').count().collect()
+    baskets.unpersist()
+    summary = dict(
+        processes_with_items=total_processes,
+        multi_segment_baskets=n,
+        multi_segment_share=n / total_processes,
+        min_count=COPURCHASE_MIN_COUNT,
+        min_confidence=COPURCHASE_CONFIDENCE,
+        basket_sizes={int(r['k']): r['count'] for r in sizes},
+    )
+    return (
+        sorted(itemsets, key=lambda r: -r['count']),
+        sorted(rules, key=lambda r: (-r['lift'], -r['support'])),
+        summary,
+    )
+
+
 def run(spark):
     timer = StepTimer()
     tx = baskets(spark).cache()
@@ -261,6 +324,8 @@ def run(spark):
         targeted, informed, non_competitive = single_bidder_rules(tx)
     with timer.step('calidad de las canastas'):
         missing = missing_report(tx).toPandas()
+    with timer.step('qué se compra junto (segmentos UNSPSC)'):
+        co_itemsets, co_rules, co_summary = copurchase(spark)
 
     save_csv('association/algorithm_benchmark.csv', benchmark + full_benchmark)
     save_csv('association/frequent_itemsets_apriori.csv', sample_itemsets)
@@ -285,6 +350,13 @@ def run(spark):
     )
     save_csv('association/single_bidder_rules.csv', targeted)
     save_csv('association/missing_report.csv', missing)
+    save_csv('association/copurchase_itemsets.csv', co_itemsets, ['items', 'names', 'size', 'count', 'support'])
+    save_csv(
+        'association/copurchase_rules.csv',
+        co_rules,
+        ['antecedent', 'consequent', 'antecedent_codes', 'consequent_codes', 'support', 'confidence', 'lift'],
+    )
+    save_json('association/copurchase_summary.json', co_summary)
     selected = select_rules(general, targeted)
     save_json(
         'association/selected_rules.json',
