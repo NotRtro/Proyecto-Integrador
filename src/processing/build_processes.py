@@ -34,7 +34,7 @@ from src.processing.text_features import DOMAIN_STOPWORD_DF, SHINGLE_WIDTH, doma
 BASE = 'ocid source_file release_date effective_date date_source year month'.split()
 FIELDS = {
     'processes': BASE + (
-        'buyer_id buyer_name buyer_level department category method method_details tender_code tender_amount_pen '
+        'buyer_id buyer_name buyer_level department category method method_details modality tender_code tender_amount_pen '
         'tender_amount_original currency tender_conversion_method tender_exchange_rate negative_amount extreme_amount '
         'award_amount_pen award_converted_count award_unconverted_count bidders competition amount_band text '
         'normalized_text item_count award_count supplier_count').split(),
@@ -53,7 +53,7 @@ DERIVED = {'suppliers': ['supplier_name_original', 'supplier_type']}
 # Tabla delgada para las Partes II, III y V: lo justo para representar y muestrear procesos.
 # Las tablas completas (montos, conversiones, conteos) quedan en `processes`.
 FEATURE_COLUMNS = ['ocid', 'effective_date', 'year', 'month', 'buyer_id', 'buyer_level', 'department', 'category',
-                   'method', 'amount_band', 'competition', 'tender_amount_pen', 'text', 'normalized_text', 'shingles']
+                   'modality', 'amount_band', 'competition', 'tender_amount_pen', 'text', 'normalized_text', 'shingles']
 SUPPLIER_TYPES = ['persona_natural', 'persona_juridica', 'consorcio', 'extranjero', 'otro']
 GRAINS = {'items': ['ocid', 'item_id'], 'awards': ['ocid', 'award_id'],
           'suppliers': ['ocid', 'award_id', 'supplier_id'], 'contracts': ['ocid', 'contract_id']}

@@ -5,7 +5,8 @@ exporta como artefacto para la web (calcular una vez, explorar muchas).
 
 Cobertura del EDA exigido por el enunciado:
 - Distribución temporal: monthly_evolution (año, mes) y totales anuales en Spark SQL.
-- Variables categóricas: categoría, modalidad (method), departamento, nivel de gobierno,
+- Variables categóricas: categoría, modalidad peruana (modality, agrupada desde
+  procurementMethodDetails), departamento, nivel de gobierno,
   competencia.
 - Montos: histograma en escala logarítmica y percentiles por año y categoría (los
   montos públicos tienen colas muy largas; la media sola engaña).
@@ -15,8 +16,8 @@ Cobertura del EDA exigido por el enunciado:
 from pyspark.sql import functions as F
 
 NOT_INFORMED = 'NO INFORMADO'
-CATEGORICAL = ['department', 'category', 'buyer_id', 'buyer_name', 'buyer_level', 'method', 'method_details']
-CUBE_DIMENSIONS = ['year', 'month', 'department', 'category', 'method', 'buyer_level', 'buyer_id', 'buyer_name',
+CATEGORICAL = ['department', 'category', 'buyer_id', 'buyer_name', 'buyer_level', 'method', 'method_details', 'modality']
+CUBE_DIMENSIONS = ['year', 'month', 'department', 'category', 'modality', 'buyer_level', 'buyer_id', 'buyer_name',
                    'competition', 'amount_band']
 def amounts():
     """Medidas comunes de cada agregación (función: una Column necesita SparkSession activa)."""
@@ -27,7 +28,7 @@ def amounts():
 
 PERCENTILES = [0.1, 0.25, 0.5, 0.75, 0.9, 0.99]
 LOG_BIN = 0.25  # ancho del intervalo en log10(soles): cuatro intervalos por orden de magnitud
-SINGLE_BIDDER_DIMENSIONS = ['method', 'category', 'department', 'amount_band', 'buyer_level']
+SINGLE_BIDDER_DIMENSIONS = ['modality', 'category', 'department', 'amount_band', 'buyer_level']
 
 
 def with_informed_categories(processes):
@@ -47,7 +48,7 @@ def distributions(processes):
     return {
         'monthly_evolution': processes.groupBy('year', 'month').agg(*amounts()).orderBy('year', 'month'),
         'category_distribution': processes.groupBy('year', 'category').agg(*amounts()),
-        'method_distribution': processes.groupBy('year', 'method', 'category').agg(*amounts()),
+        'modality_distribution': processes.groupBy('year', 'modality', 'category').agg(*amounts()),
         'department_distribution': processes.groupBy('year', 'department').agg(*amounts()),
         'buyer_level_distribution': processes.groupBy('year', 'buyer_level').agg(*amounts()),
         'competition_distribution': processes.groupBy('year', 'competition').agg(*amounts()),

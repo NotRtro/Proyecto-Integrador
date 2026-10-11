@@ -95,6 +95,39 @@ def amount_band(value):
     return 'alto' if value < 10_000_000 else 'muy alto'
 
 
+MODALITIES = [
+    # (prefijo normalizado de procurementMethodDetails, modalidad). El orden importa: los
+    # nombres más largos primero ("licitacion publica abreviada" antes que "licitacion publica").
+    ('adjudicacion simplificada', 'Adjudicación Simplificada'),
+    ('subasta inversa', 'Subasta Inversa Electrónica'),
+    ('comparacion precios', 'Comparación de Precios'),  # normalize_text quita "de"
+    ('contratacion directa', 'Contratación Directa'),
+    ('licitacion publica abreviada', 'Licitación Pública Abreviada'),
+    ('licitacion publica', 'Licitación Pública'),
+    ('concurso publico abreviado', 'Concurso Público Abreviado'),
+    ('concurso publico', 'Concurso Público'),
+    ('regimen especial', 'Régimen o procedimiento especial'),
+    ('procedimiento especial', 'Régimen o procedimiento especial'),
+    ('convenio', 'Convenio'),
+    ('contratacion internacional', 'Contratación Internacional'),
+    ('adjudicacion selectiva', 'Adjudicación Selectiva o Abreviada'),
+    ('adjudicacion abreviada', 'Adjudicación Selectiva o Abreviada'),
+]
+
+
+def procurement_modality(details):
+    """Modalidad peruana a partir de procurementMethodDetails.
+
+    procurementMethod (open/selective/limited/direct) es demasiado grueso: "open" cubre
+    más del 80 % de los procesos. El detalle trae la modalidad de la normativa peruana
+    con variantes (homologación, decretos de urgencia); se agrupan en su modalidad base.
+    """
+    if not details:
+        return None
+    text = normalize_text(details)
+    return next((name for prefix, name in MODALITIES if text.startswith(prefix)), 'Otra')
+
+
 def competition_level(bidders):
     if bidders is None or bidders < 1:
         return 'sin dato'
@@ -198,6 +231,7 @@ def flatten(record, source):
         buyer_id=buyer.get('id'), buyer_name=buyer.get('name'), buyer_level=buyer_level(buyer.get('name')),
         department=buyer_department(record, buyer), category=tender.get('mainProcurementCategory'),
         method=tender.get('procurementMethod'), method_details=tender.get('procurementMethodDetails'),
+        modality=procurement_modality(tender.get('procurementMethodDetails')),
         tender_code=tender.get('title'),
         tender_amount_pen=amount if amount is None or amount >= 0 else None, tender_amount_original=tender_original,
         currency=tender_currency, tender_conversion_method=tender_conversion_method,

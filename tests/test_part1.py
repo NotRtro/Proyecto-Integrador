@@ -44,11 +44,11 @@ def test_rdd_and_dataframe_operations_are_equivalent(spark):
 def test_single_bidder_rate_ignores_missing(spark):
     from src.part1.eda import single_bidder_rates
     rows = [('LP', 'uno', 10.0), ('LP', 'dos a tres', 5.0), ('LP', 'sin dato', 1.0), ('AS', 'uno', 3.0)]
-    df = spark.createDataFrame(rows, 'method string, competition string, tender_amount_pen double')
+    df = spark.createDataFrame(rows, 'modality string, competition string, tender_amount_pen double')
     for column in ['category', 'department', 'amount_band', 'buyer_level']:
-        df = df.withColumn(column, df.method)
-    df = df.withColumn('year', df.method.substr(0, 0).cast('int'))
-    rates = {r.value: r for r in single_bidder_rates(df).filter("dimension = 'method' AND year = 'Todos'").collect()}
+        df = df.withColumn(column, df.modality)
+    df = df.withColumn('year', df.modality.substr(0, 0).cast('int'))
+    rates = {r.value: r for r in single_bidder_rates(df).filter("dimension = 'modality' AND year = 'Todos'").collect()}
     assert rates['LP'].single_bidder_rate == pytest.approx(0.5) and rates['LP'].missing_share == pytest.approx(1 / 3)
     assert rates['AS'].single_bidder_rate == 1.0
 
