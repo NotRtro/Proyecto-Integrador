@@ -170,6 +170,7 @@ def item_rows(base, items, date):
                 item_id=str(item.get('id', idx)),
                 description=item.get('description'),
                 classification=(item.get('classification') or {}).get('id'),
+                classification_description=(item.get('classification') or {}).get('description'),
                 quantity=number(item.get('quantity')),
                 amount_original=number(value.get('amount')),
                 amount_pen=amount,
@@ -222,6 +223,19 @@ def award_and_supplier_rows(base, awards, converted_awards, buyer_id, date):
     return award_rows, supplier_rows
 
 
+def tenderer_rows(base, tender, buyer_id):
+    """Participantes registrados en el proceso (tender.tenderers), uno por identificador.
+
+    Todo proveedor adjudicado figura también como participante, así que la tabla permite
+    medir cuántas veces participa cada proveedor, cuántas gana y quiénes nunca ganan.
+    """
+    tenderers = {t.get('id') or t.get('name'): t for t in tender.get('tenderers') or [] if t.get('id') or t.get('name')}
+    return [
+        dict(base, tenderer_id=tenderer_id, tenderer_name=tenderer.get('name'), buyer_id=buyer_id)
+        for tenderer_id, tenderer in tenderers.items()
+    ]
+
+
 def contract_rows(base, contracts, date):
     rows = []
     for idx, contract in enumerate(contracts):
@@ -248,7 +262,7 @@ def contract_rows(base, contracts, date):
 
 
 def flatten(record, source):
-    """Filas de las cinco tablas para un documento OCDS."""
+    """Filas de las seis tablas para un documento OCDS."""
     tender = record.get('tender') or {}
     date, date_source = effective_date(record)
     buyer = record.get('buyer') or tender.get('procuringEntity') or {}
@@ -312,4 +326,5 @@ def flatten(record, source):
         'awards': award_rows,
         'suppliers': supplier_rows,
         'contracts': contract_rows(base, record.get('contracts') or [], date),
+        'tenderers': tenderer_rows(base, tender, buyer.get('id')),
     }

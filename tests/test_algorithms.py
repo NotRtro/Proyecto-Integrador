@@ -163,3 +163,16 @@ def test_experiment_registry_reuses_or_measures(tmp_path, monkeypatch):
 
     registry = json.loads((tmp_path / 'metadata/experiments.json').read_text(encoding='utf-8'))
     assert registry['demo']['last_status'] == 'medido' and registry['demo']['profile'] == 'completo'
+
+
+def test_tenderers_are_unique_per_process():
+    r = {
+        'ocid': 't',
+        'tender': {
+            'datePublished': '2024-01-01',
+            'tenderers': [{'id': 'A', 'name': 'a'}, {'id': 'A', 'name': 'a'}, {'id': 'B', 'name': 'b'}],
+        },
+        'buyer': {'id': 'b1'},
+    }
+    rows = flatten(r, 'source')['tenderers']
+    assert sorted(x['tenderer_id'] for x in rows) == ['A', 'B'] and all(x['buyer_id'] == 'b1' for x in rows)

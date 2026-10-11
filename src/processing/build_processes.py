@@ -17,7 +17,7 @@ Flujo:
     5. Montos en moneda extranjera sin `amount_PEN` se convierten con medianas de las
        tasas implícitas publicadas por el propio OECE (diaria, anual o del periodo).
 
-Artefactos: data/processed/{processes,items,awards,suppliers,contracts,process_features},
+Artefactos: data/processed/{processes,items,awards,suppliers,contracts,tenderers,process_features},
 metadata/quality_summary.json, metadata/nulls_by_year.csv, metadata/exchange_rates.csv,
 metadata/analytical_schema.json.
 """
@@ -49,7 +49,8 @@ FIELDS = {
     ).split(),
     'items': BASE
     + (
-        'item_id description classification quantity amount_original amount_pen currency '
+        'item_id description classification classification_description quantity amount_original amount_pen '
+        'currency '
         'conversion_method exchange_rate conversion_reference_date'
     ).split(),
     'awards': BASE
@@ -67,10 +68,11 @@ FIELDS = {
         'contract_id award_id amount_original amount_pen currency conversion_method '
         'exchange_rate conversion_reference_date status'
     ).split(),
+    'tenderers': BASE + 'tenderer_id tenderer_name buyer_id'.split(),
 }
-CHILDREN = ['items', 'awards', 'suppliers', 'contracts']
+CHILDREN = ['items', 'awards', 'suppliers', 'contracts', 'tenderers']
 # Columnas calculadas en Spark después del parseo (no salen de `flatten`).
-DERIVED = {'suppliers': ['supplier_name_original', 'supplier_type']}
+DERIVED = {'suppliers': ['supplier_name_original', 'supplier_type'], 'tenderers': ['tenderer_type']}
 # Tabla delgada para las Partes II, III y V: lo justo para representar y muestrear procesos.
 # Las tablas completas (montos, conversiones, conteos) quedan en `processes`.
 FEATURE_COLUMNS = [
@@ -96,6 +98,7 @@ GRAINS = {
     'awards': ['ocid', 'award_id'],
     'suppliers': ['ocid', 'award_id', 'supplier_id'],
     'contracts': ['ocid', 'contract_id'],
+    'tenderers': ['ocid', 'tenderer_id'],
 }
 INTS = set('year month item_count award_count supplier_count award_converted_count award_unconverted_count'.split())
 FLOATS = set(
@@ -343,21 +346,35 @@ def normalize_suppliers(suppliers):
       contratos de Gobierno a Gobierno, defensa, seguros y arbitrajes internacionales.
     """
     latest = Window.partitionBy('supplier_id').orderBy(F.col('release_date').desc(), F.col('ocid').desc())
-    identifier = F.regexp_extract('supplier_id', r'^PE-RUC-(.+)$', 1)
-    digits = F.regexp_extract('supplier_id', r'(\d+)$', 1)
-    name = F.upper(F.coalesce('supplier_name', F.lit('')))
-    supplier_type = (
+    return (
+        suppliers.withColumn('supplier_name_original', F.col('supplier_name'))
+        .withColumn('supplier_name', F.first('supplier_name').over(latest))
+        .withColumn('supplier_type', entity_type('supplier_id', 'supplier_name'))
+        .select(*output_fields('suppliers'))
+    )
+
+
+def entity_type(id_column, name_column):
+    """Tipo de proveedor según su identificador (ver normalize_suppliers)."""
+    identifier = F.regexp_extract(id_column, r'^PE-RUC-(.+)$', 1)
+    digits = F.regexp_extract(id_column, r'(\d+)$', 1)
+    name = F.upper(F.coalesce(name_column, F.lit('')))
+    return (
         F.when(identifier.startswith('L') | identifier.startswith('99'), 'extranjero')
         .when(name.rlike(r'(^|\s)CONSORCIO\b') | F.length(identifier).between(6, 7), 'consorcio')
         .when((F.length(digits) == 11) & digits.rlike('^(10|15|17)'), 'persona_natural')
         .when((F.length(digits) == 11) & digits.startswith('20'), 'persona_juridica')
         .otherwise('otro')
     )
+
+
+def normalize_tenderers(tenderers):
+    """Nombre canónico por identificador (el más reciente) y tipo, como en los proveedores."""
+    latest = Window.partitionBy('tenderer_id').orderBy(F.col('release_date').desc(), F.col('ocid').desc())
     return (
-        suppliers.withColumn('supplier_name_original', F.col('supplier_name'))
-        .withColumn('supplier_name', F.first('supplier_name').over(latest))
-        .withColumn('supplier_type', supplier_type)
-        .select(*output_fields('suppliers'))
+        tenderers.withColumn('tenderer_name', F.first('tenderer_name').over(latest))
+        .withColumn('tenderer_type', entity_type('tenderer_id', 'tenderer_name'))
+        .select(*output_fields('tenderers'))
     )
 
 
@@ -599,6 +616,7 @@ def run(spark=None):
     for name in ['items', 'awards', 'contracts']:
         tables[name] = apply_historical_rates(tables[name], rates)
     tables['suppliers'] = normalize_suppliers(allocate_to_suppliers(tables['suppliers'], tables['awards']))
+    tables['tenderers'] = normalize_tenderers(tables['tenderers'])
     with timer.step('stopwords de dominio'):
         stopwords = domain_stopwords(selected_rows)
         save_json(
