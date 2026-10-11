@@ -81,9 +81,9 @@ export default function Similarity() {
             <Tooltip formatter={integer} /><Legend />{KINDS.map((k, i) => <Bar key={k} dataKey={k} fill={['#de7c45', '#167c80', '#384b72'][i]} />)}
           </BarChart></ResponsiveContainer></div>
       </Card>
-      <DataTable rows={s.repeated_summary.map(r => ({ tipo: r.kind, año: r.year, pares: r.pairs, 'procesos involucrados': r.processes_involved, reconvocatorias: r.reconvocation_pairs, entidades: r.buyers, 'Jaccard medio': decimal(r.mean_jaccard, 3) }))} />
+      <DataTable rows={s.repeated_summary.map(r => ({ tipo: r.kind, año: r.year, pares: r.pairs, 'procesos involucrados': r.processes_involved, reconvocatorias: r.reconvocation_pairs, 'mismo procedimiento': r.same_procedure_pairs ?? '—', entidades: r.buyers, 'Jaccard medio': decimal(r.mean_jaccard, 3) }))} />
       <div className="two-col">
-        <Card title="Entidades que más repiten en ≤ 30 días" subtitle="Sin contar reconvocatorias">
+        <Card title="Entidades que más repiten en ≤ 30 días" subtitle="Sin reconvocatorias ni pares del mismo procedimiento">
           <DataTable rows={s.repeated_top_buyers.map(r => ({ entidad: r.left_buyer_name, nivel: r.left_buyer_level, procesos: r.processes_involved, pares: r.pairs, 'días entre sí': decimal(r.mean_days_apart, 1) }))} limit={12} />
         </Card>
         <Card title="Textos compartidos por cientos de procesos" subtitle="Buckets LSH demasiado grandes para expandir en pares">
@@ -96,7 +96,14 @@ export default function Similarity() {
           <summary><span>{c.left_tender_code} · {c.right_tender_code}</span><b>Jaccard {decimal(c.jaccard, 3)} · {c.days_apart} días</b></summary>
           <div className="compare"><p><strong>{c.left_buyer_name}</strong><br />{c.left_text}</p><p><strong>{c.right_buyer_name}</strong><br />{c.right_text}</p></div>
         </details>)}</div>
-        <p className="empty">{reviewed.casos.length ? `${reviewed.casos.length} casos revisados por el equipo.` : 'Ningún caso validado todavía: el equipo los registra en frontend/src/content/similarity_cases.json.'}</p>
+      </Card>
+      <Card title="Casos interpretados" subtitle="Pares revisados en el registro OCDS completo de ambos procesos; la nomenclatura permite ubicarlos en el buscador del SEACE">
+        {reviewed.casos.length ? <div className="pair-list">{reviewed.casos.map(c => <details key={`${c.left}-${c.right}`} open={c === reviewed.casos[0]}>
+          <summary><span>{c.titulo}</span><b>{c.tipo} · Jaccard {decimal(c.jaccard, 2)}</b></summary>
+          <p className="hint">{c.left_tender_code} · {c.right_tender_code} — {c.entidades} · estado: {c.estado}</p>
+          <p><strong>Lectura.</strong> {c.interpretacion}</p>
+          <p><strong>Límite.</strong> {c.limitacion}</p>
+        </details>)}</div> : <p className="empty">Sin casos interpretados.</p>}
       </Card>
     </FindingModule>
 

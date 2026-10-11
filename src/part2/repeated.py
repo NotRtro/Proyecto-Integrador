@@ -14,9 +14,19 @@ Reconvocatoria: la nomenclatura OECE termina en el número de convocatoria
 (AS-SM-12-2024-MDCH/CS-1, ...-2). Si dos procesos de la misma entidad comparten la
 nomenclatura salvo ese número, se marcan como reconvocatoria.
 
+Mismo procedimiento: dos ocid de la misma entidad con la misma nomenclatura (sin
+espacios ni signos, p. ej. "DIRECTA-4-2025-MML/OGA/OL.-1" y "DIRECTA-4-2025-MML-OGA-OL-1").
+Dentro de una entidad la nomenclatura identifica un único procedimiento y su
+convocatoria, así que no se exige la misma fecha. Son dos cosas que el OCDS no distingue:
+copias del mismo registro (misma fecha y monto, una sin adjudicación) o ítems de un
+procedimiento publicados por separado (montos y ganadores distintos). En ninguno de los
+dos casos es un requerimiento convocado otra vez, así que se excluyen de los rankings y
+de los casos.
+
 Ninguna categoría implica irregularidad: son señales para priorizar revisión.
 """
 
+from pyspark.sql import Window
 from pyspark.sql import functions as F
 
 SHORT_WINDOW_DAYS = 30
@@ -47,12 +57,19 @@ def classify(similar, processes):
     days = F.abs(F.datediff(F.to_date('left_effective_date'), F.to_date('right_effective_date')))
     base_code = lambda c: F.regexp_replace(F.col(c), r'-\d+$', '')  # noqa: E731 (nomenclatura sin el número final)
     same_buyer = F.col('left_buyer_id') == F.col('right_buyer_id')
+    code_key = lambda c: F.upper(F.regexp_replace(F.col(c), r'[^0-9A-Za-z]', ''))  # noqa: E731
+    duplicate = same_buyer & (code_key('left_tender_code') == code_key('right_tender_code'))
     return (
         similar.join(left, 'left')
         .join(right, 'right')
         .withColumn('days_apart', days)
         .withColumn('same_buyer', same_buyer)
-        .withColumn('reconvocation', same_buyer & (base_code('left_tender_code') == base_code('right_tender_code')))
+        .withColumn('same_procedure', F.coalesce(duplicate, F.lit(False)))
+        # Excluyentes: misma nomenclatura = mismo procedimiento; solo cambia el número final = reconvocatoria.
+        .withColumn(
+            'reconvocation',
+            same_buyer & (base_code('left_tender_code') == base_code('right_tender_code')) & ~F.col('same_procedure'),
+        )
         .withColumn(
             'kind',
             F.when(same_buyer & (F.col('days_apart') <= SHORT_WINDOW_DAYS), CATEGORIES[0])
@@ -78,6 +95,7 @@ def summary(pairs):
     totals = with_year.groupBy('kind', 'year').agg(
         F.count('*').alias('pairs'),
         F.sum(F.col('reconvocation').cast('int')).alias('reconvocation_pairs'),
+        F.sum(F.col('same_procedure').cast('int')).alias('same_procedure_pairs'),
         F.countDistinct('left_buyer_id').alias('buyers'),
         F.avg('jaccard').alias('mean_jaccard'),
     )
@@ -85,8 +103,8 @@ def summary(pairs):
 
 
 def top_buyers(pairs, n=30):
-    """Entidades con más procesos repetidos en <= 30 días, sin contar reconvocatorias."""
-    short = pairs.filter((F.col('kind') == CATEGORIES[0]) & ~F.col('reconvocation'))
+    """Entidades con más procesos repetidos en <= 30 días, sin reconvocatorias ni pares del mismo procedimiento."""
+    short = pairs.filter((F.col('kind') == CATEGORIES[0]) & ~F.col('reconvocation') & ~F.col('same_procedure'))
     keys = ['left_buyer_id', 'left_buyer_name', 'left_buyer_level', 'left_department']
     stats = short.groupBy(*keys).agg(
         F.count('*').alias('pairs'),
@@ -103,13 +121,22 @@ def case_candidates(pairs, features, per_kind=5):
     textos y la nomenclatura para buscarlos en el buscador público del SEACE.
     """
     texts = features.select('ocid', 'text')
-    ranked = pairs.withColumn(
-        'amount', F.coalesce('left_tender_amount_pen', F.lit(0)) + F.coalesce('right_tender_amount_pen', F.lit(0))
+    # Un mismo par de nomenclaturas puede repetirse con otros ocid (copias o ítems de uno de
+    # los dos procesos): se conserva un solo par por combinación de nomenclaturas.
+    codes = F.array_sort(F.array('left_tender_code', 'right_tender_code'))
+    first = Window.partitionBy(codes).orderBy('left', 'right')
+    ranked = (
+        pairs.withColumn(
+            'amount', F.coalesce('left_tender_amount_pen', F.lit(0)) + F.coalesce('right_tender_amount_pen', F.lit(0))
+        )
+        .withColumn('code_rank', F.row_number().over(first))
+        .filter(F.col('code_rank') == 1)
+        .drop('code_rank')
     )
     rows = []
     for kind in CATEGORIES:
         chosen = (
-            ranked.filter((F.col('kind') == kind) & ~F.col('reconvocation'))
+            ranked.filter((F.col('kind') == kind) & ~F.col('reconvocation') & ~F.col('same_procedure'))
             .orderBy(F.desc('amount'))
             .limit(per_kind)
             .join(texts.withColumnRenamed('ocid', 'left').withColumnRenamed('text', 'left_text'), 'left')

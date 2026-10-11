@@ -105,20 +105,27 @@ def test_repeated_requirements_classification():
                 ('p2', 'b1', 'B1', 'local', 'LIMA', 'goods', 'AS', '2024-01-10', 2024, 'AS-SM-1-2024-X-2', 10.0),
                 ('p3', 'b1', 'B1', 'local', 'LIMA', 'goods', 'AS', '2024-06-01', 2024, 'AS-SM-9-2024-X-1', 10.0),
                 ('p4', 'b2', 'B2', 'local', 'PIURA', 'goods', 'AS', '2024-01-05', 2024, 'AS-SM-3-2024-Y-1', 10.0),
+                # Mismo procedimiento que p1: la nomenclatura solo cambia en la puntuación.
+                # (republicado días después: la nomenclatura identifica el procedimiento, no la fecha).
+                ('p5', 'b1', 'B1', 'local', 'LIMA', 'goods', 'AS', '2024-01-04', 2024, 'AS-SM-1-2024-X/1', 10.0),
             ],
             cols,
         )
         similar = spark.createDataFrame(
-            [('p1', 'p2', 0.9), ('p1', 'p3', 0.8), ('p1', 'p4', 0.75), ('p2', 'p3', 0.8)],
+            [('p1', 'p2', 0.9), ('p1', 'p3', 0.8), ('p1', 'p4', 0.75), ('p2', 'p3', 0.8), ('p1', 'p5', 1.0)],
             'left string, right string, jaccard double',
         )
         pairs = {(r.left, r.right): r for r in repeated.classify(similar, processes).collect()}
         assert pairs[('p1', 'p2')].kind == repeated.CATEGORIES[0] and pairs[('p1', 'p2')].reconvocation
         assert pairs[('p1', 'p3')].kind == repeated.CATEGORIES[1] and not pairs[('p1', 'p3')].reconvocation
         assert pairs[('p1', 'p4')].kind == repeated.CATEGORIES[2]
+        assert pairs[('p1', 'p5')].same_procedure and not pairs[('p1', 'p5')].reconvocation
+        assert not any(pairs[k].same_procedure for k in [('p1', 'p2'), ('p1', 'p3'), ('p1', 'p4')])
         involved = {
             r.kind: r.processes_involved for r in repeated.summary(repeated.classify(similar, processes)).collect()
         }
         assert involved[repeated.CATEGORIES[1]] == 3  # pares (p1,p3) y (p2,p3): tres procesos distintos
+        top = repeated.top_buyers(repeated.classify(similar, processes)).collect()
+        assert top == []  # en <= 30 días solo hay una reconvocatoria y un par del mismo procedimiento
     finally:
         spark.stop()
