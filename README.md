@@ -65,6 +65,7 @@ docker compose run --rm pipeline python -m src.run_all
 
 ```bash
 make test                                              # pytest (incluye Spark), API y frontend
+make notebook                                          # genera y ejecuta notebooks/sustento.ipynb
 cd frontend && npm ci && npm test                      # tests de render de la web (vitest)
 docker compose run --rm pipeline python -m src.run_all --from-stage part2   # reanudar desde una etapa
 docker compose run --rm pipeline python -m src.part3.run                      # una parte sola
@@ -93,11 +94,15 @@ cd frontend && VITE_STATIC=1 VITE_BASE=/Proyecto-Integrador/ npm run build
 | `src/processing/text_features.py` | **Spark SQL** | Stopwords por frecuencia documental y shingles sin UDF de Python |
 | `src/part1/` (EDA, concentración, RDD vs. DataFrame, particionamiento) | **Spark** | Exigido por el enunciado; solo se traen al driver resultados agregados |
 | `src/part1/spark_vs_pandas.py` | Spark y local | Compara ambos motores en la misma agregación |
+| `src/part1/participation.py` | **Spark** | Frecuencia de ítems (segmentos UNSPSC) y participación: quién participa, quién gana y quién nunca gana |
 | `src/part2/full_corpus.py`, `repeated.py` | **Spark** | LSH sobre los 196 mil procesos sin comparar todos los pares |
+| `src/part2/groups.py` | Spark + local | Une los pares en grupos (componentes conexas) y los etiqueta con las palabras más distintivas |
 | `src/part2/evaluation.py` | local + Spark | La verdad exacta de la muestra (X·Xᵀ disperso) cabe en el driver; los candidatos LSH se calculan en Spark |
 | `src/part3/` | local | TF-IDF, SVD y los índices faiss viven en la memoria de una máquina; las consultas tardan microsegundos |
 | `src/part4/` | Spark + local | Spark ordena el flujo; las estructuras procesan un evento a la vez, como en tiempo real |
-| `src/part5/` | **Spark** + local | FP-Growth (MLlib) sobre todas las canastas; Apriori propio sobre una muestra como referencia |
+| `src/part4/replay.py` | **Spark Structured Streaming** | Reproduce el flujo una semana por micro-lote (fuente de archivos, `foreachBatch`, checkpoint) |
+| `src/part5/` | **Spark** + local | FP-Growth (MLlib) sobre todas las canastas y sobre los segmentos UNSPSC que se compran juntos; Apriori propio sobre una muestra como referencia |
+| `scripts/build_notebook.py` | local | Genera `notebooks/sustento.ipynb`: un gráfico y una comprobación automática por afirmación |
 | `src/export/web_artifacts.py` | local | 19 controles de consistencia antes de servir la web |
 | `api/` | FastAPI | Filtra artefactos precalculados; no recalcula métricas oficiales |
 | `frontend/` | React | Reporte por pregunta; controles que recalculan en vivo las curvas teóricas |
@@ -121,7 +126,8 @@ Cada módulo explica en su docstring el motor que usa y el motivo, sus entradas 
 - `artifacts/metadata/`: manifiestos de fuente y de corrida (con el commit del código), calidad, esquema, stopwords y tiempos de procesamiento.
 - `artifacts/{eda,similarity,ann,streaming,association}/`: resultados de cada parte.
 - `artifacts/metadata/artifact_validation.json`: 19 controles, entre ellos conservación de montos, garantías de Bloom, CMS y DGIM, FPR de Bloom igual al teórico con la misma ocupación, equivalencia Apriori = FP-Growth y MinHash que se acerca a la teoría.
-- `tests/`: 62 tests de pytest (algoritmos e integración con Spark). `frontend/src/__tests__`: render de todas las páginas con datos reales y completitud del contenido escrito.
+- `notebooks/sustento.ipynb`: el sustento de cada parte con gráficos y comprobaciones automáticas (✔/✘) contra la teoría o la versión exacta; se regenera con `make notebook`.
+- `tests/`: 66 tests de pytest (algoritmos e integración con Spark). `frontend/src/__tests__`: render de todas las páginas con datos reales y completitud del contenido escrito.
 
 ## Interpretaciones y casos
 
