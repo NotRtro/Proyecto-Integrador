@@ -16,17 +16,9 @@ from pyspark.sql import functions as F
 from src.common import processes, save_csv, save_json
 from src.config import ARTIFACTS, PROCESSED
 from src.part2.repeated import CATEGORIES, SHORT_WINDOW_DAYS
+from src.processing.model import COMPETITIVE_MODALITIES as COMPETITIVE
+from src.processing.model import DIRECT_MODALITY as DIRECT
 
-COMPETITIVE = [
-    'Adjudicación Simplificada',
-    'Subasta Inversa Electrónica',
-    'Comparación de Precios',
-    'Licitación Pública',
-    'Licitación Pública Abreviada',
-    'Concurso Público',
-    'Concurso Público Abreviado',
-]
-DIRECT = 'Contratación Directa'
 MIN_BUYER_AWARDS = 20
 DOMINANT_SHARE = 0.30
 MIN_BUYER_PROCESSES = 50

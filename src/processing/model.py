@@ -117,6 +117,19 @@ MODALITIES = [
     ('adjudicacion abreviada', 'Adjudicación Selectiva o Abreviada'),
 ]
 
+# Modalidades que la norma diseña con concurso entre varios proveedores. "Adjudicación Selectiva o
+# Abreviada" queda fuera por decisión operativa: agrupa procedimientos de regímenes propios.
+COMPETITIVE_MODALITIES = [
+    'Adjudicación Simplificada',
+    'Subasta Inversa Electrónica',
+    'Comparación de Precios',
+    'Licitación Pública',
+    'Licitación Pública Abreviada',
+    'Concurso Público',
+    'Concurso Público Abreviado',
+]
+DIRECT_MODALITY = 'Contratación Directa'
+
 
 def procurement_modality(details):
     """Modalidad peruana a partir de procurementMethodDetails.
@@ -224,7 +237,7 @@ def award_and_supplier_rows(base, awards, converted_awards, buyer_id, date):
 
 
 def tenderer_rows(base, tender, buyer_id):
-    """Participantes registrados en el proceso (tender.tenderers), uno por identificador.
+    """Participantes reportados en el proceso (tender.tenderers), uno por identificador.
 
     Todo proveedor adjudicado figura también como participante, así que la tabla permite
     medir cuántas veces participa cada proveedor, cuántas gana y quiénes nunca ganan.

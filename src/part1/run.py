@@ -13,6 +13,7 @@ Artefactos (artifacts/eda/):
     top_buyers.csv, top_suppliers.csv          rankings con participación
     single_bidder_rates.csv                    tasa de postor único por dimensión (Q2)
     bidders_by_modality.csv                    qué cuenta el número de postores
+    single_bidder_adjusted.csv                 tasa por modalidad a igual mezcla de estratos
     item_segments.csv, item_codes.csv, item_segments_by_year.csv, item_summary.json   frecuencia de ítems
     participation_rankings.csv, participation_bins.csv, participation_summary.json
                                                quién participa, quién gana y quién nunca gana (Q1, Q2)
@@ -55,6 +56,9 @@ def run(spark):
         export('amount_outlier_summary', eda.amount_outliers(processes))
         export('single_bidder_rates', eda.single_bidder_rates(processes))
         export('bidders_by_modality', eda.bidders_by_modality(processes))
+        adjusted, persistence = eda.adjusted_competition(processes)
+        save_csv('eda/single_bidder_adjusted.csv', adjusted)
+        save_json('eda/single_bidder_persistence.json', persistence)
         # La categoría viene del proceso; se agrega aquí porque supplier_frame solo trae contexto geográfico.
         suppliers_with_category = suppliers.join(processes.select('ocid', 'category'), 'ocid', 'left')
         supplier_cube = suppliers_with_category.groupBy(

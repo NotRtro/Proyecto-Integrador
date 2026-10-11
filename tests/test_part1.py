@@ -122,3 +122,33 @@ def test_participation_counts_wins_and_never_won(spark):
     never = [r['id'] for r in rankings if r['ranking'] == 'nunca_ganan']
     assert never == ['B']  # 25 participaciones sin ganar (mínimo 20)
     assert all(r['id'] != 'N' for r in rankings)  # personas naturales sin nombre en los rankings
+
+
+@pytest.mark.integration
+def test_adjusted_competition_uses_the_competitive_mix(spark):
+    from src.part1.eda import adjusted_competition
+
+    # Competitivas: 30 procesos de bienes (3 con un postor) y 10 de servicios (5): pesos 0.75 y 0.25.
+    # Directa: bienes 10 de 20 con un postor (0.5) y servicios 20 de 20 (1.0).
+    def block(modality, category, total, single):
+        return [
+            (modality, category, 'LIMA', 2024, 'bajo', 'uno' if i < single else 'cuatro o mas') for i in range(total)
+        ]
+
+    rows = (
+        block('Licitación Pública', 'goods', 30, 3)
+        + block('Licitación Pública', 'services', 10, 5)
+        + block('Contratación Directa', 'goods', 20, 10)
+        + block('Contratación Directa', 'services', 20, 20)
+        + [('Contratación Directa', 'goods', 'LIMA', 2024, 'bajo', 'sin dato')]
+    )
+    df = spark.createDataFrame(
+        rows, 'modality string, category string, department string, year int, amount_band string, competition string'
+    )
+    result, persistence = adjusted_competition(df)
+    direct = next(r for r in result if r['level'] == 'modalidad' and r['name'] == 'Contratación Directa')
+    assert direct['informed'] == 40 and direct['raw_rate'] == pytest.approx(0.75)
+    # Con la mezcla de las competitivas: 0.75 * 0.5 + 0.25 * 1.0 = 0.625.
+    assert direct['adjusted_rate'] == pytest.approx(0.625) and direct['strata_coverage'] == pytest.approx(1)
+    # Servicios no llega a 20 procesos competitivos: solo se compara el estrato de bienes.
+    assert persistence['comparable_strata'] == 1 and persistence['strata_where_direct_is_higher'] == 1

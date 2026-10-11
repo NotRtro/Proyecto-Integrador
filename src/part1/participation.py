@@ -7,7 +7,7 @@ son el código UNSPSC del bien o servicio y los 2 primeros, su segmento (combust
 medicamentos, construcción...). Se cuentan ítems, procesos, entidades y monto por
 segmento y por código.
 
-Participación. `tender.tenderers` lista a los participantes registrados de cada proceso,
+Participación. `tender.tenderers` lista a los participantes que reporta la fuente en cada proceso,
 y todo proveedor adjudicado figura entre ellos (verificado en los datos). Por proveedor:
 - participaciones: procesos en los que se registró;
 - victorias: procesos en los que recibió al menos una adjudicación;
@@ -249,6 +249,7 @@ def participation_summary(stats, tenderers):
         overall_win_rate=s['wins'] / s['participations'],
         top100_participation_share=top / s['participations'],
         by_type=by_type,
-        note='Participante = registrado en el proceso (tender.tenderers), no necesariamente con oferta presentada. '
+        note='Participante = el que reporta la fuente (tender.tenderers); probablemente inscrito, no necesariamente '
+        'con oferta presentada. '
         'Las personas naturales no aparecen con nombre en los rankings.',
     )

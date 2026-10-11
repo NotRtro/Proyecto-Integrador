@@ -38,6 +38,7 @@ REQUIRED = [
     'eda/buyer_supplier_hhi.csv',
     'eda/single_bidder_rates.csv',
     'eda/bidders_by_modality.csv',
+    'eda/single_bidder_adjusted.csv',
     'similarity/lsh_parameter_grid.csv',
     'similarity/minhash_error.csv',
     'similarity/s_curve_observed.csv',
@@ -131,6 +132,9 @@ def analytic_checks():
         'rules_metrics_in_range': between(rules.support)
         and between(rules.confidence)
         and bool((rules.lift >= 0).all()),
+        'adjusted_rates_in_range': all(
+            between(read('eda/single_bidder_adjusted.csv')[c]) for c in ['raw_rate', 'adjusted_rate', 'strata_coverage']
+        ),
         'signals_cover_every_process': bool((signals[signals.year == 'Todos'].processes == processes).all()),
         'signal_rates_in_range': between(signals.rate.dropna()) and bool((signals.flagged <= signals.evaluable).all()),
     }

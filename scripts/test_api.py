@@ -49,6 +49,8 @@ assert all(0 <= r["hhi"] <= 10000 for r in concentration["market"])
 
 competition = get("/api/competition", {"dimension": "modality"})
 assert competition["rates"] and all(between(r["single_bidder_rate"]) for r in competition["rates"])
+assert competition["adjusted"] and all(between(r["adjusted_rate"]) for r in competition["adjusted"])
+assert competition["persistence"]["comparable_strata"] >= competition["persistence"]["strata_where_direct_is_higher"]
 
 integrity = get("/api/integrity", {"dimension": "modality"})
 assert integrity["by_dimension"] and all(between(r["rate"]) for r in integrity["summary"])

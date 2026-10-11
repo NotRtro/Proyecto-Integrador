@@ -11,11 +11,14 @@ Cobertura del EDA exigido por el enunciado:
 - Montos: histograma en escala logarítmica y percentiles por año y categoría (los
   montos públicos tienen colas muy largas; la media sola engaña).
 - Frecuencia de entidades y proveedores: rankings en concentration.py.
-- Pregunta Q2: tasa de procesos con un solo postor por cada dimensión, y qué cuenta el
-  número de postores (bidders_by_modality).
+- Pregunta Q2: tasa de procesos con un solo postor por cada dimensión, qué cuenta el
+  número de postores (bidders_by_modality) y la tasa por modalidad a igual mezcla de
+  categoría, departamento, año y monto (adjusted_competition).
 """
 
 from pyspark.sql import functions as F
+
+from src.processing.model import COMPETITIVE_MODALITIES, DIRECT_MODALITY
 
 NOT_INFORMED = 'NO INFORMADO'
 CATEGORICAL = [
@@ -138,9 +141,9 @@ def bidders_by_modality(processes):
 
     El OCDS del OECE no publica ofertas (bids) y su documentación no define el campo. Una
     mediana de 9 en Adjudicación Simplificada y máximos de cientos son más compatibles con
-    participantes registrados que con ofertas presentadas: entonces "un postor" significa
-    "un solo participante" y la tasa de postor único es una cota inferior de la tasa de
-    procesos con una sola oferta.
+    participantes registrados que con ofertas presentadas. Es una hipótesis: el estándar
+    OCDS define el campo por las ofertas. Si se cumple, "un postor" significa "un solo
+    participante" y ese proceso recibió una oferta o ninguna.
     """
     known = processes.filter(F.col('bidders').isNotNull() & (F.col('bidders') >= 1))
     return (
@@ -203,3 +206,80 @@ def single_bidder_rates(processes):
         .withColumn('missing_share', 1 - F.col('informed') / F.col('processes'))
         .orderBy('dimension', 'year', F.desc('single_bidder_rate'))
     )
+
+
+STRATA = ['category', 'department', 'year', 'amount_band']
+MIN_STRATUM = 20  # procesos informados por lado para comparar dentro de un estrato
+
+
+def adjusted_competition(processes):
+    """Q2: ¿la modalidad explica el postor único, o lo explica el tipo de compra?
+
+    Estandarización directa: la tasa de cada modalidad se recalcula con la mezcla de
+    estratos (categoría, departamento, año y banda de monto) de las modalidades
+    competitivas. Spark reduce los procesos a un cubo pequeño y la ponderación se hace en
+    el driver. `strata_coverage` es la parte de esa mezcla que la modalidad llega a cubrir:
+    si es baja, la tasa ajustada se apoya en pocos estratos.
+
+    Devuelve las filas por modalidad y la comparación estrato a estrato entre contratación
+    directa y modalidades competitivas.
+    """
+    known = processes.filter(F.col('competition') != 'sin dato')
+    for column in ['category', 'department', 'modality']:
+        known = known.withColumn(column, F.coalesce(F.col(column), F.lit(NOT_INFORMED)))
+    cube = (
+        known.groupBy('modality', *STRATA)
+        .agg(F.count('*').alias('informed'), F.sum((F.col('competition') == 'uno').cast('int')).alias('single'))
+        .toPandas()
+    )
+    cube['group'] = cube.modality.map(
+        lambda m: 'competitiva' if m in COMPETITIVE_MODALITIES else 'directa' if m == DIRECT_MODALITY else 'otra'
+    )
+    reference = cube[cube.group == 'competitiva'].groupby(STRATA).informed.sum()
+    weights = reference / reference.sum()
+
+    def adjusted(part):
+        by_stratum = part.groupby(STRATA)[['informed', 'single']].sum()
+        shared = weights.reindex(by_stratum.index).dropna()
+        if shared.empty:
+            return None, 0.0
+        rates = (by_stratum.single / by_stratum.informed)[shared.index]
+        return float((rates * shared).sum() / shared.sum()), float(shared.sum())
+
+    rows = []
+    for level, key in [('grupo', 'group'), ('modalidad', 'modality')]:
+        for name, part in cube.groupby(key):
+            rate, coverage = adjusted(part)
+            rows.append(
+                dict(
+                    level=level,
+                    name=name,
+                    group=part.group.iloc[0],
+                    informed=int(part.informed.sum()),
+                    single_bidder=int(part.single.sum()),
+                    raw_rate=float(part.single.sum() / part.informed.sum()),
+                    adjusted_rate=rate,
+                    strata_coverage=coverage,
+                )
+            )
+    rows.sort(key=lambda r: (r['level'], -r['informed']))
+    by_group = cube.groupby(['group', *STRATA])[['informed', 'single']].sum().reset_index()
+    sides = by_group[by_group.group == 'directa'].merge(
+        by_group[by_group.group == 'competitiva'], on=STRATA, suffixes=('_direct', '_competitive')
+    )
+    sides = sides[(sides.informed_direct >= MIN_STRATUM) & (sides.informed_competitive >= MIN_STRATUM)]
+    gap = sides.single_direct / sides.informed_direct - sides.single_competitive / sides.informed_competitive
+    persistence = dict(
+        strata=STRATA,
+        min_processes_per_side=MIN_STRATUM,
+        comparable_strata=int(len(sides)),
+        strata_where_direct_is_higher=int((gap > 0).sum()),
+        median_gap=float(gap.median()) if len(gap) else None,
+        min_gap=float(gap.min()) if len(gap) else None,
+        direct_processes_compared=int(sides.informed_direct.sum()),
+        competitive_modalities=COMPETITIVE_MODALITIES,
+        note='Cada estrato compara contratación directa y modalidades competitivas con la misma categoría, '
+        'departamento del comprador, año y banda de monto. La tasa ajustada pondera cada estrato con su peso '
+        'entre las modalidades competitivas. Describe una asociación; no controla variables no observadas.',
+    )
+    return rows, persistence
