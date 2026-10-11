@@ -1,6 +1,6 @@
 # Minería de contrataciones OECE · 2023–2025
 
-Proyecto basado en `PLAN_EJECUCION_OECE_JSON_DOCKER.md`. Procesa los tres archivos locales `peru_oece_bulk_2023.jsonl`, `peru_oece_bulk_2024.jsonl`, `peru_oece_bulk_2025.jsonl`, genera tablas Parquet, expone resultados mediante una API FastAPI y presenta cinco experimentos en una aplicación React.
+Proyecto basado en `PLAN_EJECUCION_OECE_JSON_DOCKER.md`. Descarga los archivos anuales OCDS del OECE (`data/raw/peru_oece_bulk_{2023,2024,2025}.jsonl.gz`, unos 330 MB comprimidos) desde el [Registro de Datos OCDS](https://data.open-contracting.org/es/publication/135) (licencia CC BY 4.0), genera tablas Parquet, expone resultados mediante una API FastAPI y presenta cinco experimentos en una aplicación React.
 
 ## Ejecutar
 
@@ -15,12 +15,13 @@ Equivale a:
 ```bash
 docker compose build
 docker compose up -d --wait spark-master spark-worker-1 spark-worker-2 api web
+docker compose run --rm --no-deps pipeline python -m src.ingestion.download
 docker compose run --rm pipeline python -m src.run_all
 ```
 
 Abrir **http://localhost:8501**. La documentación interactiva de la API está en **http://localhost:8000/docs**. Spark Master: http://localhost:8080; workers: http://localhost:8081 y http://localhost:8082.
 
-Los archivos originales se montan en solo lectura. `artifacts/` y `data/processed/` son directorios persistentes del anfitrión; `docker compose down` no los elimina. No se duplican ni descargan los 3 GB ya proporcionados. También se admite `.jsonl.gz`. Evitar colocar copias de los mismos archivos en la raíz.
+`data/raw/`, `data/processed/` y `artifacts/` son directorios persistentes del anfitrión; `docker compose down` no los elimina. La descarga es reanudable y no se repite si el archivo local coincide en tamaño y fecha de publicación (`--force` la fuerza). `data/raw/download_manifest.json` registra URL, fecha `Last-Modified`, tamaño y SHA-256 de cada archivo: el portal se actualiza mensualmente, así que ese manifiesto identifica la versión exacta de los datos usada. Se admiten `.jsonl` y `.jsonl.gz`, pero no el mismo año en ambos formatos.
 
 ## Comandos
 
@@ -30,8 +31,8 @@ Los archivos originales se montan en solo lectura. `artifacts/` y `data/processe
 make test
 # Validación, hashes y cobertura, sin Spark:
 docker compose run --rm pipeline python -m src.ingestion.validate_files
-# Compatibilidad con el paso de descarga del plan (registra entradas locales):
-docker compose run --rm pipeline python -m src.ingestion.download
+# Descargar o actualizar los archivos fuente (sin Docker: python -m src.ingestion.download):
+docker compose run --rm --no-deps pipeline python -m src.ingestion.download
 # Rehacer tablas:
 docker compose run --rm pipeline python -m src.processing.build_processes
 # Cada parte por separado, una vez construidas las tablas:

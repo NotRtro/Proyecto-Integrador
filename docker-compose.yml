@@ -4,7 +4,8 @@ x-pipeline: &pipeline
     dockerfile: Dockerfile.pipeline
   image: oece-pipeline:local
   volumes:
-    - .:/data/raw:ro
+    # Escritura permitida: download.py guarda aquí los .jsonl.gz y su manifiesto.
+    - ./data/raw:/data/raw
     - ./data/processed:/data/processed
     - ./artifacts:/artifacts
   environment: &environment

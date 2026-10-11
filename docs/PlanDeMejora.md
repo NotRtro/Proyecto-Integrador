@@ -38,7 +38,7 @@ Fuente de los puntos: [EvaluacionYMejoras.md](EvaluacionYMejoras.md). Cada paso 
 | Recurso | Estado | Implicancia |
 |---|---|---|
 | Docker 29.7 + Compose v5 | Instalado, **daemon apagado** | Hay que iniciar Docker Desktop antes de la Fase 0 |
-| Archivos JSONL 2023–2025 | **No están en la máquina** | El paso 0.1 los descarga (unos 330 MB comprimidos) |
+| Archivos JSONL 2023–2025 | Descargados en `data/raw/` (327 MB, publicación del 04/10/2026, 279 105 registros) | Listo |
 | Python 3.12 y Java 17 locales | Disponibles | Permite correr tests y Spark `local[*]` sin Docker. `hnswlib` y `faiss` pueden no tener wheel en Windows, así que la corrida oficial sigue siendo en Docker |
 | Disco libre | 96 GB | Suficiente |
 
@@ -56,7 +56,7 @@ Fase 0 Cimientos ─► Fase 1 Capa de datos ─► Fases 2–6 Partes I–V ─
 
 | Paso | IDs | Qué se hace | Criterio de aceptación |
 |---|---|---|---|
-| [ ] 0.1 | C-03 | `download.py` descarga de verdad los `.jsonl.gz` 2023–2025 del registro OCDS (publicación 135), con reintentos, reanudación y SHA-256. Los datos van a `data/raw/` y `docker-compose.yml` monta `./data/raw` en lugar de la raíz del repo. | `python -m src.ingestion.download` deja los 3 archivos y `validate_files` pasa |
+| [x] 0.1 | C-03 | `download.py` descarga de verdad los `.jsonl.gz` 2023–2025 del registro OCDS (publicación 135), con reintentos, reanudación y SHA-256. Los datos van a `data/raw/` y `docker-compose.yml` monta `./data/raw` en lugar de la raíz del repo. | `python -m src.ingestion.download` deja los 3 archivos y `validate_files` pasa |
 | [ ] 0.2 | — | `scripts/make_dev_sample.py` toma N líneas por año y las deja en `data/raw_dev/`. La variable `RAW_PATH` permite elegir completo o muestra. | `run_all` termina sobre la muestra en menos de 10 min |
 | [ ] 0.3 | B-01, B-02, B-03, VI-07 | Corregir la carga infinita en Ann y Similarity cuando la API falla. Quitar "198 mil" y los años escritos en el código: un endpoint `/api/meta` entrega años y totales. | Con la API caída, la página muestra el error. No quedan cifras ni años fijos en `frontend/src` |
 | [ ] 0.4 | B-04, V-05 | `test_api.py` valida invariantes (rangos, no vacío, `found >= 8` o estado `insufficient_evidence`) en lugar de cantidades exactas. | `make test` pasa con artefactos de la muestra |
@@ -183,6 +183,6 @@ Fase 0 Cimientos ─► Fase 1 Capa de datos ─► Fases 2–6 Partes I–V ─
 |---|---|
 | LSH sobre todo el corpus genera buckets enormes por plantillas comunes | Tope de tamaño por bucket, reportado como limitación; stopwords de dominio (1.4) |
 | Escalamiento de ANN a unos 200k vectores consume mucha RAM | SVD a 256 dimensiones en float32 (unos 200 MB) y consultas por lotes |
-| `faiss-cpu` / `hnswlib` sin wheel en Windows | La corrida oficial se hace en Docker (Linux); localmente esos tests se omiten |
+| `hnswlib` no compila en Windows (verificado); `faiss-cpu` sí instala | Evaluar en la Fase 4 usar faiss para HNSW (`IndexHNSWFlat`) e IVF, lo que permite correr todo también sin Docker |
 | La corrida completa tarda horas | Modo muestra (0.2) para iterar; `--from-stage` para reanudar |
 | Las cifras cambian con las nuevas reglas y rompen textos ya escritos | Los textos del equipo se escriben **después** de la corrida completa de la Fase 6 |

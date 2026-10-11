@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-RAW = Path(os.getenv('RAW_PATH', '.'))
+RAW = Path(os.getenv('RAW_PATH', 'data/raw'))
 PROCESSED = Path(os.getenv('PROCESSED_PATH', 'data/processed'))
 ARTIFACTS = Path(os.getenv('ARTIFACTS_PATH', 'artifacts'))
 YEARS = [int(x) for x in os.getenv('ANALYSIS_YEARS', '2023,2024,2025').split(',')]
