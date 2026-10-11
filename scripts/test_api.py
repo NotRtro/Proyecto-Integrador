@@ -30,31 +30,45 @@ assert years and meta["selected_processes"] > 0 and meta["raw_records"] >= meta[
 
 overview = get("/api/overview")
 assert overview["quality"]["selected_processes"] == meta["selected_processes"]
+assert all(overview["validation"]["checks"].values())
 
 quality = get("/api/quality")
-assert len(quality["sources"]) == meta["source"]["files"] >= 1
+assert len(quality["sources"]) == meta["source"]["files"] >= 1 and quality["stopwords"]["terms"]
 
 options = get("/api/eda/options")
-assert set(years).issubset(set(options["year"]))
+assert set(years).issubset(set(options["year"])) and options["modality"]
 eda = get("/api/eda", {"year": years[-1], "metric": "processes", "limit": 5})
-assert eda["totals"]["processes"] > 0 and len(eda["buyers"]) <= 5
-assert between(eda["top10_share"]) and 0 <= eda["hhi"] <= 10000
+assert eda["totals"]["processes"] > 0 and len(eda["buyers"]) <= 5 and eda["modalities"]
+technical = get("/api/eda/technical")
+assert technical["benchmark"] and technical["partitioning"]["pruning"]["rows"] > 0
 
-similarity = get("/api/similarity", {"status": "TP", "limit": 3})
-assert similarity["grid"] and len(similarity["pairs"]) <= 3
+concentration = get("/api/concentration", {"year": years[-1]})
+assert all(0 <= r["hhi"] <= 10000 for r in concentration["market"])
+
+competition = get("/api/competition", {"dimension": "modality"})
+assert competition["rates"] and all(between(r["single_bidder_rate"]) for r in competition["rates"])
+
+similarity = get("/api/similarity")
+assert similarity["grid"] and similarity["minhash_error"]
 assert all(between(r["precision"]) and between(r["recall"]) for r in similarity["grid"])
+pairs = get("/api/similarity/pairs", {"config": similarity["default_config"], "status": "TP", "limit": 3})
+assert len(pairs["pairs"]) <= 3
 
-ann = get("/api/ann", {"k": 5})
-assert 1 <= len(ann["neighbors"]) <= 5
-assert all(between(r["recall_at_10"]) for r in ann["grid"])
+ann = get("/api/ann")
+assert ann["hnsw"] and ann["ivf"] and all(between(r["recall_at_10"]) for r in ann["hnsw"] + ann["ivf"])
+neighbors = get("/api/ann/neighbors", {"query": ann["queries"][0]["ocid"], "config": "exact"})
+assert 1 <= len(neighbors["neighbors"]) <= 10
 
 streaming = get("/api/streaming")
 assert all(row["fn"] == 0 for row in streaming["bloom"]), "Bloom no puede tener falsos negativos"
-assert all(row["estimate"] >= row["exact"] for row in streaming["cms"]), "CMS no puede subestimar"
+assert all(row["underestimates"] == 0 for row in streaming["cms"]), "CMS no puede subestimar"
 
-association = get("/api/association", {"support": .02, "confidence": .5})
+association = get("/api/association")
 selected = association["selected"]
 assert selected["found"] >= 8 or selected["status"] == "insufficient_evidence"
 assert all(r["support"] >= .02 and r["confidence"] >= .5 for r in association["rules"])
 
-print(f"PASS API: 10 endpoints verificados para {meta['period']}")
+discussion = get("/api/discussion")
+assert discussion["run"]["status"] == "complete"
+
+print(f"PASS API: 15 endpoints verificados para {meta['period']}")
