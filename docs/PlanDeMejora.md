@@ -114,22 +114,22 @@ Fase 0 Cimientos ─► Fase 1 Capa de datos ─► Fases 2–6 Partes I–V ─
 
 | Paso | IDs | Qué se hace | Criterio de aceptación |
 |---|---|---|---|
-| [ ] 5.1 | — | El flujo pasa a ser de **adjudicaciones** (evento = proveedor adjudicado con fecha), ordenado por fecha. Así hay proveedores y pares entidad-proveedor. | Conteo de eventos en `methodology.json` |
-| [ ] 5.2 | IV-02, G-01 (Q1) | Bloom sobre pares `(buyer_id, supplier_id)`: "¿este proveedor ya ganó antes con esta entidad?". FPR observado frente a teórico. | Decenas de miles de claves insertadas |
-| [ ] 5.3 | IV-01, G-03 | CMS sobre `supplier_id` y códigos UNSPSC: error en heavy hitters frente a la cola, y fracción de estimaciones dentro de la cota ε·N. | Error mayor que cero y cota verificada |
-| [ ] 5.4 | IV-04, G-01 (Q2) | DGIM con ventana en **días** además de en eventos. Bits: postor único y alto monto. | Test nuevo para la ventana temporal |
-| [ ] 5.5 | IV-03 | Exportar n, cardinalidades y distribución exacta de frecuencias para que la web recalcule en vivo el FPR de Bloom (m, k) y la cota de CMS (w, d). | Artefacto `streaming/live_params.json` |
-| [ ] 5.6 | IV-05, IV-06, C-01, C-02 | Limpiar `n%max(100,500)`, docstrings y formato. Recomendación por estructura en `methodology.json`. | — |
+| [x] 5.1 | — | El flujo pasa a ser de **adjudicaciones** (evento = proveedor adjudicado con fecha), ordenado por fecha. Así hay proveedores y pares entidad-proveedor. | Conteo de eventos en `methodology.json` **Resultado:** Flujo de 161 255 adjudicaciones (proveedor adjudicado con fecha) y flujo de 194 202 ítems con código UNSPSC. |
+| [x] 5.2 | IV-02, G-01 (Q1) | Bloom sobre pares `(buyer_id, supplier_id)`: "¿este proveedor ya ganó antes con esta entidad?". FPR observado frente a teórico. | Decenas de miles de claves insertadas **Resultado:** Clave (entidad, proveedor): 112 323 pares distintos. Con 64 KB (2¹⁹ bits, k=5) el FPR observado es 2,9 %, frente a 13,6 MB del conjunto exacto. Tasa exacta de proveedores que repiten con la entidad: 20 % (2023), 33 % (2024), 39 % (2025). |
+| [x] 5.3 | IV-01, G-03 | CMS sobre `supplier_id` y códigos UNSPSC: error en heavy hitters frente a la cola, y fracción de estimaciones dentro de la cota ε·N. | Error mayor que cero y cota verificada **Resultado:** CMS sobre 70 739 proveedores y 17 377 códigos UNSPSC. Cota ε·N cumplida en el 100 % de las claves; error relativo de los 100 más frecuentes 7,5 % (8192×5) frente a la cola, mucho mayor: el sketch sirve para los frecuentes. |
+| [x] 5.4 | IV-04, G-01 (Q2) | DGIM con ventana en **días** además de en eventos. Bits: postor único y alto monto. | Test nuevo para la ventana temporal **Resultado:** DGIM con ventanas de 1 000 y 10 000 eventos y de 7 y 30 días; bits postor único y monto ≥ S/ 1 millón. Error relativo máximo 30 % (cota 50 %). Test nuevo con varios eventos por día. |
+| [x] 5.5 | IV-03 | Exportar n, cardinalidades y distribución exacta de frecuencias para que la web recalcule en vivo el FPR de Bloom (m, k) y la cota de CMS (w, d). | Artefacto `streaming/live_params.json` **Resultado:** `streaming/live_params.json` con n, observados y frecuencias; la web recalcula en vivo FPR(m, k) y ε, δ, ε·N. |
+| [x] 5.6 | IV-05, IV-06, C-01, C-02 | Limpiar `n%max(100,500)`, docstrings y formato. Recomendación por estructura en `methodology.json`. | — **Resultado:** Docstrings con la teoría de cada estructura; `n%max(100,500)` eliminado; memoria de cada estructura frente a su referencia exacta. |
 
 ### Fase 6: Parte V (reglas)
 
 | Paso | IDs | Qué se hace | Criterio de aceptación |
 |---|---|---|---|
-| [ ] 6.1 | V-04 | Canasta nueva: se agrega `NIVEL=` y `ANIO` sale de la canasta (el año se usa solo para las métricas por año). La justificación queda en la metodología. | Test de `transaction` actualizado |
-| [ ] 6.2 | V-02, G-01 (Q2) | Reglas con consecuente fijo `POSTORES=uno` (y `cuatro o mas` como contraste). Se marcan las reglas triviales o normativas (por ejemplo modalidad ↔ banda de monto). | `association/single_bidder_rules.csv` y columna `kind` |
-| [ ] 6.3 | V-03 | Reporte de "sin dato" por atributo. Las reglas con "sin dato" pasan a un artefacto aparte en lugar de descartarse. | `association/missing_report.csv` |
-| [ ] 6.4 | V-01 | Se elimina la interpretación f-string. Las reglas seleccionadas se enlazan con `content/rules.json`, donde el equipo escribe la interpretación. La lectura automática de métricas se rotula como tal. | Ninguna "interpretación" generada por plantilla |
-| [ ] 6.5 | C-01, C-02 | Docstrings y formato en `part5/`. | — |
+| [x] 6.1 | V-04 | Canasta nueva: se agrega `NIVEL=` y `ANIO` sale de la canasta (el año se usa solo para las métricas por año). La justificación queda en la metodología. | Test de `transaction` actualizado **Resultado:** Canasta con CAT, MODALIDAD (modalidad peruana agrupada desde procurementMethodDetails, porque procurementMethod es “open” en el 82 %), DEP, MONTO, POSTORES y NIVEL; sin ANIO. |
+| [x] 6.2 | V-02, G-01 (Q2) | Reglas con consecuente fijo `POSTORES=uno` (y `cuatro o mas` como contraste). Se marcan las reglas triviales o normativas (por ejemplo modalidad ↔ banda de monto). | `association/single_bidder_rules.csv` y columna `kind` **Resultado:** Reglas dirigidas a POSTORES=uno solo en modalidades competitivas (se excluyen, por datos, las de más de 50 % de postor único: internacional, directa, régimen especial, convenio, selectiva). Tipo normativa/informativa/datos faltantes (592/49/17 reglas globales). |
+| [x] 6.3 | V-03 | Reporte de "sin dato" por atributo. Las reglas con "sin dato" pasan a un artefacto aparte en lugar de descartarse. | `association/missing_report.csv` **Resultado:** `missing_report.csv`: solo POSTORES tiene “sin dato” (≈ 10 %); las reglas con “sin dato” se marcan como tal en lugar de descartarse. |
+| [x] 6.4 | V-01 | Se elimina la interpretación f-string. Las reglas seleccionadas se enlazan con `content/rules.json`, donde el equipo escribe la interpretación. La lectura automática de métricas se rotula como tal. | Ninguna "interpretación" generada por plantilla **Resultado:** Sin interpretaciones generadas: `automatic_reading` rotulada como lectura literal y `frontend/src/content/rules.json` para el equipo. 9 reglas seleccionadas (5 generales + 4 de Q2), sin redundancias ni variantes del mismo factor. |
+| [x] 6.5 | C-01, C-02 | Docstrings y formato en `part5/`. | — **Resultado:** Docstrings en `part5/`; tests en `test_part5.py` (tipo de regla, lift dirigido, métricas por año, selección diversa). |
 
 ### Fase 7: Exportación y API
 

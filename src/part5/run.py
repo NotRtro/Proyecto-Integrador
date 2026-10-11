@@ -1,59 +1,210 @@
+"""Parte V: conjuntos frecuentes y reglas de asociación (Apriori y FP-Growth).
+
+Motor: FP-Growth de Spark MLlib sobre todas las canastas; Apriori propio en el driver
+sobre una muestra, para verificar que ambos encuentran exactamente los mismos conjuntos.
+
+Pasos:
+1. Apriori frente a FP-Growth sobre la misma muestra (soportes 2 %, 5 % y 10 %): mismos
+   conjuntos o la corrida falla; se comparan tiempos.
+2. FP-Growth sobre todas las canastas: conjuntos frecuentes y reglas (soporte >= 2 %,
+   confianza >= 50 %), cada una con su tipo (informativa, normativa, datos faltantes)
+   y sus métricas recalculadas por año.
+3. Reglas dirigidas (Q2): ¿qué combinaciones elevan la probabilidad de tener un solo
+   postor (y, como contraste, cuatro o más) donde debería haber competencia? Se minan
+   procesos con postores informados, sin las modalidades no competitivas por diseño
+   (más de 50 % de postor único) y con soporte bajo (0,2 %): los grupos son pequeños.
+4. Calidad: proporción de "sin dato" por atributo y año.
+
+Artefactos (artifacts/association/): algorithm_benchmark.csv, frequent_itemsets_*.csv,
+rules.csv, single_bidder_rules.csv, missing_report.csv, selected_rules.json.
+"""
 import json
 import time
+
 from pyspark.ml.fpm import FPGrowth
-from src.config import SEED, APRIORI_SAMPLE, spark_session
-from src.common import processes,sample_processes,save_csv,save_json
-from src.part5.transactions import transaction
+from pyspark.sql import functions as F
+
+from src.common import StepTimer, features as read_features, sample_processes, save_csv, save_json
+from src.config import APRIORI_SAMPLE, spark_session
 from src.part5.apriori import apriori
+from src.part5.rules import automatic_reading, metrics_by_year, pick, rule_kind, targeted_rules
+from src.part5.transactions import ATTRIBUTES, MISSING, transaction
+
+SUPPORTS = [0.02, 0.05, 0.1]
+RULE_SUPPORT = 0.02
+RULE_CONFIDENCE = 0.5
+TARGET_SUPPORT = 0.002
+TARGET_MIN_COUNT = 100
+TARGET_MIN_LIFT = 1.2
+TARGETS = ['POSTORES=uno', 'POSTORES=cuatro o mas']
+NON_COMPETITIVE_RATE = 0.5
+SELECTED_GENERAL = 5
+SELECTED_SINGLE_BIDDER = 5
+
+
+def baskets(spark):
+    columns = ['ocid', 'year'] + [column for _, column in ATTRIBUTES]
+    rows = read_features(spark).select(*columns).rdd.map(lambda r: (r.ocid, int(r.year), transaction(r)))
+    return spark.createDataFrame(rows, 'ocid string, year int, items array<string>')
+
+
+def compare_algorithms(spark):
+    """Apriori y FP-Growth sobre exactamente las mismas canastas de la muestra."""
+    sample = [transaction(row) for _, row in sample_processes(spark, APRIORI_SAMPLE).iterrows()]
+    frame = spark.createDataFrame([(t,) for t in sample], 'items array<string>').cache()
+    frame.count()
+    rows, itemsets = [], []
+    for support in SUPPORTS:
+        start = time.perf_counter()
+        exact = apriori(sample, support)
+        apriori_seconds = time.perf_counter() - start
+        start = time.perf_counter()
+        model = FPGrowth(itemsCol='items', minSupport=support).fit(frame)
+        found = {frozenset(r['items']): r['freq'] for r in model.freqItemsets.collect()}
+        fpgrowth_seconds = time.perf_counter() - start
+        if found != exact:
+            raise AssertionError(f'Apriori y FP-Growth difieren con soporte {support}')
+        for algorithm, seconds in [('Apriori', apriori_seconds), ('FP-Growth', fpgrowth_seconds)]:
+            rows.append(dict(algorithm=algorithm, scope='same_sample', support=support, seconds=seconds,
+                             transactions=len(sample), itemsets=len(exact), equivalent=True))
+        itemsets.extend(dict(min_support=support, items=json.dumps(sorted(k), ensure_ascii=False), frequency=v,
+                             support=v / len(sample)) for k, v in exact.items())
+    frame.unpersist()
+    return rows, itemsets
+
+
+def full_rules(tx, total):
+    """FP-Growth sobre todas las canastas: conjuntos por soporte y reglas al 2 %."""
+    benchmark, itemsets, rules = [], [], []
+    for support in SUPPORTS:
+        start = time.perf_counter()
+        model = FPGrowth(itemsCol='items', minSupport=support, minConfidence=RULE_CONFIDENCE).fit(tx)
+        found = model.freqItemsets.collect()
+        raw_rules = model.associationRules.collect() if support == RULE_SUPPORT else []
+        benchmark.append(dict(algorithm='FP-Growth', scope='full', support=support, seconds=time.perf_counter() - start,
+                              transactions=total, itemsets=len(found), equivalent=None))
+        itemsets.extend(dict(min_support=support, items=json.dumps(sorted(r['items']), ensure_ascii=False),
+                             frequency=r['freq'], support=r['freq'] / total) for r in found)
+        rules.extend(raw_rules)
+    return benchmark, itemsets, rules
+
+
+def rules_by_year(raw_rules, tx):
+    """Cada regla con sus métricas globales y por año (recontadas en las canastas del año)."""
+    grouped = {}
+    for row in tx.groupBy('year', 'items').count().collect():
+        grouped.setdefault(str(row['year']), []).append((set(row['items']), row['count']))
+    grouped = {'Todos': sum(grouped.values(), []), **grouped}
+    rows = []
+    for rule in raw_rules:
+        antecedent, consequent = set(rule.antecedent), set(rule.consequent)
+        if rule.lift <= 1:
+            continue
+        kind = rule_kind(antecedent | consequent)
+        for metrics in metrics_by_year(antecedent, consequent, grouped):
+            rows.append(dict(antecedent=' ∧ '.join(sorted(antecedent)), consequent=' ∧ '.join(sorted(consequent)),
+                             kind=kind, antecedent_size=len(antecedent), size=len(antecedent | consequent), **metrics))
+    return rows
+
+
+def non_competitive_modalities(informed):
+    """Modalidades donde más de la mitad de los procesos tiene un solo postor.
+
+    Son no competitivas por diseño (contratación directa, convenios, contratación
+    internacional, regímenes especiales): incluirlas en las reglas dirigidas solo
+    redescubriría que allí hay un único proveedor. Se calcula de los datos, no se fija a mano.
+    """
+    modality = F.filter('items', lambda i: i.startswith('MODALIDAD='))[0]
+    single = F.array_contains('items', 'POSTORES=uno').cast('int')
+    rows = (informed.groupBy(modality.alias('modality')).agg(F.avg(single).alias('rate'), F.count('*').alias('n'))
+            .collect())
+    return sorted((dict(modality=r['modality'], single_bidder_rate=r['rate'], processes=r['n'])
+                   for r in rows if r['rate'] > NON_COMPETITIVE_RATE), key=lambda e: -e['single_bidder_rate'])
+
+
+def single_bidder_rules(tx):
+    """Reglas dirigidas a POSTORES=uno (y su contraste) donde debería haber competencia.
+
+    Se excluyen los procesos sin postores informados y los de modalidades no competitivas
+    por diseño (ver non_competitive_modalities).
+    """
+    informed = tx.filter(~F.array_contains('items', f'POSTORES={MISSING}')).cache()
+    excluded = non_competitive_modalities(informed)
+    competitive = informed
+    if excluded:
+        competitive = informed.filter(~F.arrays_overlap('items', F.array(*[F.lit(e['modality']) for e in excluded])))
+    total = competitive.count()
+    model = FPGrowth(itemsCol='items', minSupport=TARGET_SUPPORT).fit(competitive)
+    itemsets = {frozenset(r['items']): r['freq'] for r in model.freqItemsets.collect()}
+    informed.unpersist()
+    rows = []
+    for target in TARGETS:
+        rows.extend(targeted_rules(itemsets, total, target, TARGET_MIN_COUNT, TARGET_MIN_LIFT))
+    return rows, total, excluded
+
+
+def missing_report(tx):
+    """Proporción de "sin dato" por atributo y año."""
+    exploded = tx.select('year', F.explode('items').alias('item'))
+    parts = F.split('item', '=')
+    return (exploded.withColumn('attribute', parts[0]).withColumn('missing', (parts[1] == MISSING).cast('int'))
+            .groupBy('attribute', 'year').agg(F.count('*').alias('processes'), F.sum('missing').alias('missing'))
+            .withColumn('missing_share', F.col('missing') / F.col('processes'))
+            .orderBy('attribute', 'year'))
+
+
+def select_rules(general, targeted):
+    """Ocho o más reglas para interpretar: informativas generales y de postor único, sin redundancia."""
+    chosen = []
+    candidates = sorted((r for r in general if r['year'] == 'Todos' and r['kind'] == 'informativa'
+                         and r['support'] >= RULE_SUPPORT and r['confidence'] >= RULE_CONFIDENCE and r['size'] <= 3),
+                        key=lambda r: (-r['lift'], -r['support']))
+    pick(candidates, SELECTED_GENERAL, 'general', chosen)
+    single = [r for r in targeted if r['consequent'] == 'POSTORES=uno' and r['kind'] == 'informativa']
+    pick(single, SELECTED_SINGLE_BIDDER, 'postor único (Q2)', chosen, unique_items=True)
+    for rule in chosen:
+        rule.pop('_items')
+        rule.pop('_antecedent')
+        rule['automatic_reading'] = automatic_reading(rule)
+        rule['rule_id'] = f"{rule['antecedent']} → {rule['consequent']}"
+    return chosen
 
 
 def run(spark):
-    df=processes(spark).select('ocid','year','category','method','department','amount_band','competition')
-    tx=spark.createDataFrame(df.rdd.map(lambda r:(r.ocid,int(r.year),transaction(r))), 'ocid string, year int, items array<string>').cache(); n=tx.count()
-    sample=sample_processes(spark,APRIORI_SAMPLE)
-    baskets=[transaction(r) for _,r in sample.iterrows()]
-    sdf=spark.createDataFrame([(t,) for t in baskets], 'items array<string>').cache(); sdf.count()
-    benchmarks=[]; apriori_rows=[]; full_rows=[]; rules=[]
-    for support in [.02,.05,.1]:
-        print(f'Asociación: soporte={support}, muestra={len(baskets)}, total={n}',flush=True)
-        start=time.perf_counter(); exact=apriori(baskets,support); elapsed=time.perf_counter()-start
-        benchmarks.append(dict(algorithm='Apriori',scope='same_sample',support=support,seconds=elapsed,transactions=len(baskets),itemsets=len(exact),equivalent=True))
-        apriori_rows.extend(dict(min_support=support,items=json.dumps(sorted(k),ensure_ascii=False),frequency=v,support=v/len(baskets)) for k,v in exact.items())
-        start=time.perf_counter(); model=FPGrowth(itemsCol='items',minSupport=support,minConfidence=.5).fit(sdf); found={frozenset(r.items):r.freq for r in model.freqItemsets.collect()}; elapsed=time.perf_counter()-start
-        assert found==exact, 'Apriori y FP-Growth difieren sobre la misma muestra'
-        benchmarks.append(dict(algorithm='FP-Growth',scope='same_sample',support=support,seconds=elapsed,transactions=len(baskets),itemsets=len(found),equivalent=True))
-        start=time.perf_counter(); full=FPGrowth(itemsCol='items',minSupport=support,minConfidence=.5).fit(tx)
-        items=full.freqItemsets.collect(); raw_rules=full.associationRules.collect(); elapsed=time.perf_counter()-start
-        benchmarks.append(dict(algorithm='FP-Growth',scope='full',support=support,seconds=elapsed,transactions=n,itemsets=len(items),equivalent=None))
-        full_rows.extend(dict(min_support=support,items=json.dumps(sorted(r.items),ensure_ascii=False),frequency=r.freq,support=r.freq/n) for r in items)
-        if support==.02:
-            # Coverage by year uses the full transactions, not just years named in a rule.
-            grouped={}
-            for row in tx.groupBy('year','items').count().collect():
-                grouped.setdefault(row.year,[]).append((set(row.items),row['count']))
-            for r in raw_rules:
-                ant=set(r.antecedent); con=set(r.consequent)
-                if r.lift<=1 or any('sin dato' in t for t in ant|con): continue
-                # Avoid purely chronological rules and reverse duplicates in selected cases later.
-                for year, entries in [('Todos',sum(grouped.values(),[]))]+[(str(y),v) for y,v in grouped.items()]:
-                    total=sum(c for _,c in entries); joint=sum(c for b,c in entries if ant|con<=b); na=sum(c for b,c in entries if ant<=b); nc=sum(c for b,c in entries if con<=b)
-                    confidence=joint/na if na else 0.; lift=confidence/(nc/total) if nc else 0.
-                    rules.append(dict(year=year,antecedent=' ∧ '.join(sorted(ant)),consequent=' ∧ '.join(sorted(con)),support=joint/total,confidence=confidence,lift=lift,antecedent_size=len(ant),consequent_size=len(con),size=len(ant|con),count=joint,transactions=total))
-    save_csv('association/frequent_itemsets_apriori.csv',apriori_rows)
-    save_csv('association/frequent_itemsets_fpgrowth.csv',full_rows)
-    save_csv('association/rules.csv',rules,['year','antecedent','consequent','support','confidence','lift','antecedent_size','consequent_size','size','count','transactions'])
-    selected=[]; used=set()
-    for r in sorted([r for r in rules if r['year']=='Todos' and r['support']>=.02 and r['confidence']>=.5 and r['lift']>1 and r['size']<=3 and 'ANIO=' not in r['antecedent']+r['consequent']],key=lambda x:(-x['lift'],-x['support'])):
-        key=frozenset((r['antecedent']+' ∧ '+r['consequent']).split(' ∧ '))
-        if key in used: continue
-        used.add(key)
-        selected.append(dict(**r,interpretation=f"Entre procesos con {r['antecedent']}, {r['confidence']:.1%} también tienen {r['consequent']}. La combinación cubre {r['support']:.1%} del conjunto y su lift es {r['lift']:.2f}. Es una asociación descriptiva, no causal."))
-        if len(selected)==8: break
-    save_json('association/selected_rules.json',{'rules':selected,'required':8,'found':len(selected),'status':'complete' if len(selected)>=8 else 'insufficient_evidence','note':'No se fabrican reglas cuando no hay ocho que superen los criterios.'})
-    save_csv('association/algorithm_benchmark.csv',benchmarks)
-    tx.unpersist(); sdf.unpersist()
+    timer = StepTimer()
+    tx = baskets(spark).cache()
+    total = tx.count()
+    with timer.step('Apriori frente a FP-Growth (muestra)'):
+        benchmark, sample_itemsets = compare_algorithms(spark)
+    with timer.step('FP-Growth sobre todas las canastas'):
+        full_benchmark, full_itemsets, raw_rules = full_rules(tx, total)
+    with timer.step('reglas por año'):
+        general = rules_by_year(raw_rules, tx)
+    with timer.step('reglas dirigidas a postor único (Q2)'):
+        targeted, informed, non_competitive = single_bidder_rules(tx)
+    with timer.step('calidad de las canastas'):
+        missing = missing_report(tx).toPandas()
+
+    save_csv('association/algorithm_benchmark.csv', benchmark + full_benchmark)
+    save_csv('association/frequent_itemsets_apriori.csv', sample_itemsets)
+    save_csv('association/frequent_itemsets_fpgrowth.csv', full_itemsets)
+    save_csv('association/rules.csv', general, ['year', 'antecedent', 'consequent', 'kind', 'support', 'confidence',
+                                                'lift', 'antecedent_size', 'size', 'count', 'transactions'])
+    save_csv('association/single_bidder_rules.csv', targeted)
+    save_csv('association/missing_report.csv', missing)
+    selected = select_rules(general, targeted)
+    save_json('association/selected_rules.json', dict(
+        rules=selected, required=8, found=len(selected), status='complete' if len(selected) >= 8 else 'insufficient_evidence',
+        note='automatic_reading es una lectura literal de las métricas. La interpretación en contexto la escribe el '
+             'equipo en frontend/src/content/rules.json, usando rule_id como clave.',
+        transactions=total, competitive_transactions=informed, non_competitive_modalities=non_competitive))
+    save_json('association/part5_timings.json', timer.steps)
+    tx.unpersist()
+
 
 if __name__ == '__main__':
-    s=spark_session()
-    try: run(s)
-    finally: s.stop()
+    session = spark_session()
+    try:
+        run(session)
+    finally:
+        session.stop()

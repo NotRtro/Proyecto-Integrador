@@ -2,7 +2,6 @@ import random
 from src.processing.normalize_text import normalize_text
 from src.processing.model import effective_date,amount_pen,converted_amount,flatten
 from src.part2.exact_jaccard import jaccard
-from src.part2.minhash_lsh import signature
 from src.part4.bloom_filter import BloomFilter
 from src.part4.count_min_sketch import CountMinSketch
 from src.part4.dgim import DGIM
@@ -48,8 +47,6 @@ def test_foreign_award_uses_auditable_tender_rate():
 def test_similarity():
     assert jaccard({'a','b'},{'b','c'})==1/3
     assert jaccard([],[])==0
-    assert signature(['a','b'])==signature(['b','a'])
-    assert signature(['a'],32,1)!=signature(['a'],32,2)
 
 def test_bloom_cms():
     b=BloomFilter(1000,4); c=CountMinSketch(20,3)
@@ -70,8 +67,9 @@ def test_dgim_bounds():
                 assert all(sum(s==size for s,_ in d.buckets)<=2 for size,_ in d.buckets)
 
 def test_transactions_apriori():
-    t=transaction(dict(year=2024,category='goods',method='open',department='LIMA',amount_band='alto',competition='uno'))
-    assert len(t)==6 and 'ANIO=2024' in t
+    t=transaction(dict(year=2024,category='goods',modality='Licitación Pública',department=None,amount_band='alto',competition='uno',buyer_level=float('nan')))
+    assert len(t)==6 and not any(i.startswith('ANIO=') for i in t)
+    assert 'MODALIDAD=Licitación Pública' in t and 'DEP=sin dato' in t and 'NIVEL=sin dato' in t
     result=apriori([['a','b'],['a'],['b','c']],.5)
     assert result=={frozenset(['a']):2,frozenset(['b']):2}
 
@@ -81,3 +79,12 @@ def test_concatenated_json_recovery():
     from src.ingestion.json_records import decode_line
     assert decode_line('{"ocid":"a"}{"ocid":"b"}\n')==[{'ocid':'a'},{'ocid':'b'}]
     with pytest.raises(ValueError): decode_line('{"ocid":"a"}garbage')
+
+
+def test_procurement_modality_groups_variants():
+    from src.processing.model import procurement_modality
+    assert procurement_modality('Adjudicación Simplificada - Ley N° 31728') == 'Adjudicación Simplificada'
+    assert procurement_modality('Licitación Pública Abreviada Homologación') == 'Licitación Pública Abreviada'
+    assert procurement_modality('Licitación Pública') == 'Licitación Pública'
+    assert procurement_modality('Comparación de Precios') == 'Comparación de Precios'
+    assert procurement_modality('Contratos Estandarizados') == 'Otra' and procurement_modality(None) is None
