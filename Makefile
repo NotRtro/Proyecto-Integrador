@@ -1,4 +1,4 @@
-.PHONY: all build up download run rapido test down dev-sample dev static notebook
+.PHONY: all build up download run rapido test down dev-sample dev static notebook figures
 all: build up download run
 build:
 	CODE_VERSION=$$(git rev-parse --short HEAD) docker compose build
@@ -32,3 +32,6 @@ static:
 # Cuaderno de sustento: genera notebooks/sustento.ipynb y lo ejecuta sobre los artefactos (gráficos + comprobaciones).
 notebook:
 	docker compose run --rm --no-deps -v "$(CURDIR):/workspace" pipeline sh -c "pip install -q -r requirements-notebook.txt && python scripts/build_notebook.py && jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeout=600 notebooks/sustento.ipynb"
+# Gráficos del README (assets/readme/*.png) a partir de los artefactos.
+figures:
+	docker compose run --rm --no-deps -v "$(CURDIR):/workspace" pipeline sh -c "pip install -q -r requirements-notebook.txt && python scripts/readme_figures.py"
